@@ -1,0 +1,47 @@
+﻿package GitLens4D;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS OFF}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO OFF}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE RELEASE}
+{$ENDIF IMPLICITBUILDING}
+{$IMPLICITBUILD ON}
+
+requires
+  designide,
+  rtl;
+
+contains
+  GitLens4D.Interfaces      in 'src\GitLens4D.Interfaces.pas',
+  GitLens4D.Settings        in 'src\GitLens4D.Settings.pas',
+  GitLens4D.Git.PathResolver in 'src\GitLens4D.Git.PathResolver.pas',
+  GitLens4D.Git.Runner      in 'src\GitLens4D.Git.Runner.pas',
+  GitLens4D.Git.BlameParser  in 'src\GitLens4D.Git.BlameParser.pas',
+  GitLens4D.Git.HistoryParser in 'src\GitLens4D.Git.HistoryParser.pas',
+  GitLens4D.IDE.Menu        in 'src\GitLens4D.IDE.Menu.pas',
+  GitLens4D.IDE.CursorTracker in 'src\GitLens4D.IDE.CursorTracker.pas',
+  GitLens4D.IDE.KeyBinding  in 'src\GitLens4D.IDE.KeyBinding.pas',
+  GitLens4D.IDE.Messenger   in 'src\GitLens4D.IDE.Messenger.pas',
+  GitLens4D.Wizard          in 'src\GitLens4D.Wizard.pas';
+
+end.

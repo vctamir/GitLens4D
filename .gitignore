@@ -1,0 +1,43 @@
+# ─── Delphi Compilados ────────────────────────────────────────────────────────
+*.dcu
+*.dcp
+*.bpl
+*.bpi
+*.exe
+*.dll
+*.map
+*.local
+*.identcache
+*.stat
+*.dsk
+*.~*
+*.#*
+
+# ─── Saídas de build ──────────────────────────────────────────────────────────
+Win32/
+Win64/
+bin/
+dcp/
+dcu/
+
+# ─── Gerados pelo C++Builder ──────────────────────────────────────────────────
+*.hpp
+*.obj
+*.lib
+*.tds
+*.bak
+
+# ─── Cobertura de testes ──────────────────────────────────────────────────────
+coverage/
+
+# ─── Arquivos de recurso compilados ───────────────────────────────────────────
+*.res
+*.rsm
+
+# ─── IDE / Sistema ────────────────────────────────────────────────────────────
+__history/
+__recovery/
+*.log
+Thumbs.db
+.DS_Store
+
