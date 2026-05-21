@@ -15,10 +15,11 @@ object GitStatusView: TGitStatusView
   TextHeight = 13
   object lstFiles: TListView
     Left = 0
-    Top = 49
+    Top = 66
     Width = 354
-    Height = 334
+    Height = 317
     Align = alClient
+    Checkboxes = True
     Columns = <
       item
         Caption = 'File'
@@ -33,12 +34,13 @@ object GitStatusView: TGitStatusView
         Width = 80
       end>
     GridLines = True
-    Checkboxes = True
     ReadOnly = True
     RowSelect = True
     PopupMenu = pmStatus
     TabOrder = 0
     ViewStyle = vsReport
+    ExplicitTop = 49
+    ExplicitHeight = 334
   end
   object pnlBranch: TPanel
     Left = 0
@@ -69,18 +71,9 @@ object GitStatusView: TGitStatusView
       TabOrder = 0
       OnChange = cbBranchesChange
     end
-    object chkSelectAll: TCheckBox
-      Left = 5
-      Top = 4
-      Width = 81
-      Height = 17
-      Caption = 'Select All'
-      TabOrder = 3
-      OnClick = chkSelectAllClick
-    end
     object btnNewBranch: TButton
       AlignWithMargins = True
-      Left = 90
+      Left = 88
       Top = 3
       Width = 65
       Height = 43
@@ -93,7 +86,7 @@ object GitStatusView: TGitStatusView
     end
     object btnPull: TButton
       AlignWithMargins = True
-      Left = 160
+      Left = 159
       Top = 3
       Width = 60
       Height = 43
@@ -101,7 +94,7 @@ object GitStatusView: TGitStatusView
       Caption = 'Pull'
       ImageIndex = 4
       Images = ImageList1
-      TabOrder = 4
+      TabOrder = 3
       OnClick = btnPullClick
     end
     object btnPush: TButton
@@ -119,7 +112,7 @@ object GitStatusView: TGitStatusView
     end
     object btnPR: TButton
       AlignWithMargins = True
-      Left = 290
+      Left = 291
       Top = 3
       Width = 60
       Height = 43
@@ -127,7 +120,7 @@ object GitStatusView: TGitStatusView
       Caption = 'PR'
       ImageIndex = 2
       Images = ImageList1
-      TabOrder = 5
+      TabOrder = 4
       OnClick = btnPRClick
     end
   end
@@ -252,6 +245,19 @@ object GitStatusView: TGitStatusView
       OnClick = btnCopyClick
     end
   end
+  object chkSelectAll: TCheckBox
+    Left = 0
+    Top = 49
+    Width = 354
+    Height = 17
+    Align = alTop
+    Caption = 'Select All'
+    TabOrder = 3
+    OnClick = chkSelectAllClick
+    ExplicitLeft = 22
+    ExplicitTop = 99
+    ExplicitWidth = 81
+  end
   object pmStatus: TPopupMenu
     Left = 96
     Top = 152
@@ -275,7 +281,7 @@ object GitStatusView: TGitStatusView
     Left = 184
     Top = 152
     Bitmap = {
-      494C010106000800440018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C0101060008004C0018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000600000003000000001002000000000000048
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000200000

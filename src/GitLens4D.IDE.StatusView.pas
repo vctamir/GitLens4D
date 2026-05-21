@@ -1,4 +1,4 @@
-unit GitLens4D.IDE.StatusView;
+﻿unit GitLens4D.IDE.StatusView;
 
 { ============================================================================
   GitLens4D - Janela de Status (View)
@@ -53,10 +53,10 @@ type
     btnPush: TButton;
     btnPull: TButton;
     btnCopy: TButton;
-    chkSelectAll: TCheckBox;
     ImageList1: TImageList;
     lblBranch: TLabel;
     btnPR: TButton;
+    chkSelectAll: TCheckBox;
     procedure popRefreshClick(Sender: TObject);
     procedure popDiffClick(Sender: TObject);
     procedure btnSuggestClick(Sender: TObject);
@@ -400,11 +400,19 @@ begin
     Exit;
 
   LPath := lstFiles.Selected.SubItems[0];
+  // Garante que o path termine com barra antes de concatenar o nome do arquivo
+  if not LPath.EndsWith('\') and not LPath.EndsWith('/') then
+    LPath := LPath + '\';
+
   if (LPath = '.\') or (LPath = './') then
     LPath := '';
 
   Result := LPath + lstFiles.Selected.Caption;
   Result := StringReplace(Result, '\', '/', [rfReplaceAll]);
+  
+  // Remove prefixo ./ se existir, para o git diff ser mais limpo
+  if Result.StartsWith('./') then
+    Delete(Result, 1, 2);
 end;
 
 procedure TGitStatusView.UpdateCommitMsg(const AText: string);
@@ -555,6 +563,9 @@ begin
       else
           Item.SubItems.Add('Unknown');
       end;
+      
+      // Armazena o tipo de status para uso posterior (ex: Diff)
+      Item.Data := Pointer(AFiles[I].Status);
 
       if AFiles[I].Staged then
         Item.SubItems[Item.SubItems.Count - 1] := Item.SubItems[Item.SubItems.Count - 1] + ' (Staged)';
@@ -574,12 +585,38 @@ procedure TGitStatusView.popDiffClick(Sender: TObject);
 var
   LRelativeFile: string;
   LDiffText    : string;
+  LStatus      : TGitStatusKind;
 begin
+  if lstFiles.Selected = nil then Exit;
+  
   LRelativeFile := GetSelectedRelativeFile;
   if LRelativeFile = '' then
     Exit;
 
-  LDiffText := FRunner.GetDiff(LRelativeFile, FProjectDir);
+  LStatus := TGitStatusKind(lstFiles.Selected.Data);
+
+  if LStatus = skUntracked then
+  begin
+    // Para arquivos novos, mostramos o conteúdo inteiro como adicionado (+)
+    try
+      LDiffText := FRunner.Execute(Format('git diff --no-index -- NUL "%s"', [LRelativeFile]), FProjectDir);
+      // Se falhar ou NUL não funcionar, tenta ler o arquivo e prefixar com +
+      if LDiffText.Trim = '' then
+      begin
+        LDiffText := '--- /dev/null' + sLineBreak +
+                     '+++ b/' + LRelativeFile + sLineBreak +
+                     '@@ -0,0 +1 @@' + sLineBreak +
+                     '+' + StringReplace(TFile.ReadAllText(FProjectDir + LRelativeFile.Replace('/', '\')), sLineBreak, sLineBreak + '+', [rfReplaceAll]);
+      end;
+    except
+      on E: Exception do LDiffText := 'Erro ao ler arquivo untracked: ' + E.Message;
+    end;
+  end
+  else
+  begin
+    LDiffText := FRunner.GetDiff(LRelativeFile, FProjectDir);
+  end;
+
   if LDiffText.Trim = '' then
   begin
     ShowMessage('Nenhuma diferença textual detectada.');
