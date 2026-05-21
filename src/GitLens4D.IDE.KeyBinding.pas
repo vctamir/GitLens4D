@@ -19,12 +19,16 @@ type
 
   TGitLensKeyboardBinding = class(TNotifierObject, IOTAKeyboardBinding)
   private
-    FOnShortcut: TKeyShortcutEvent;
+    FOnHistory: TKeyShortcutEvent;
+    FOnStatus: TKeyShortcutEvent;
     procedure ExecuteHistoryShortcut(const Context: IOTAKeyContext;
       KeyCode: TShortCut;
       var BindingResult: TKeyBindingResult);
+    procedure ExecuteStatusShortcut(const Context: IOTAKeyContext;
+      KeyCode: TShortCut;
+      var BindingResult: TKeyBindingResult);
   public
-    constructor Create(AOnShortcut: TKeyShortcutEvent);
+    constructor Create(AOnHistory, AOnStatus: TKeyShortcutEvent);
     function GetBindingType: TBindingType;
     function GetDisplayName: string;
     function GetName: string;
@@ -38,10 +42,11 @@ uses
 
 { TGitLensKeyboardBinding }
 
-constructor TGitLensKeyboardBinding.Create(AOnShortcut: TKeyShortcutEvent);
+constructor TGitLensKeyboardBinding.Create(AOnHistory, AOnStatus: TKeyShortcutEvent);
 begin
   inherited Create;
-  FOnShortcut := AOnShortcut;
+  FOnHistory := AOnHistory;
+  FOnStatus  := AOnStatus;
 end;
 
 function TGitLensKeyboardBinding.GetBindingType: TBindingType;
@@ -64,6 +69,8 @@ procedure TGitLensKeyboardBinding.BindKeyboard(
 begin
   BindingServices.AddKeyBinding([TextToShortCut('Ctrl+Shift+H')],
     ExecuteHistoryShortcut, nil);
+  BindingServices.AddKeyBinding([TextToShortCut('Ctrl+Alt+G')],
+    ExecuteStatusShortcut, nil);
 end;
 
 procedure TGitLensKeyboardBinding.ExecuteHistoryShortcut(
@@ -71,8 +78,17 @@ procedure TGitLensKeyboardBinding.ExecuteHistoryShortcut(
   var BindingResult: TKeyBindingResult);
 begin
   BindingResult := krHandled;
-  if Assigned(FOnShortcut) then
-    FOnShortcut;
+  if Assigned(FOnHistory) then
+    FOnHistory;
+end;
+
+procedure TGitLensKeyboardBinding.ExecuteStatusShortcut(
+  const Context: IOTAKeyContext; KeyCode: TShortCut;
+  var BindingResult: TKeyBindingResult);
+begin
+  BindingResult := krHandled;
+  if Assigned(FOnStatus) then
+    FOnStatus;
 end;
 
 end.

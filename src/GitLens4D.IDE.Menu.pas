@@ -26,19 +26,23 @@ type
     FMenuRoot  : TMenuItem;
     FMenuEditor: TMenuItem;
     FMenuDebug : TMenuItem;
+    FMenuStatus : TMenuItem;
 
     FOnEditorToggle : TMenuToggleEvent;
     FOnDebugToggle  : TMenuToggleEvent;
     FOnHistoryAction: TMenuActionEvent;
+    FOnStatusAction : TMenuActionEvent;
 
     procedure MenuEditorClick(Sender: TObject);
     procedure MenuDebugClick(Sender: TObject);
     procedure MenuHistoryClick(Sender: TObject);
+    procedure MenuStatusClick(Sender: TObject);
   public
     constructor Create(AEnabledEditor, AEnabledDebug: Boolean;
       AOnEditorToggle: TMenuToggleEvent;
       AOnDebugToggle: TMenuToggleEvent;
-      AOnHistoryAction: TMenuActionEvent);
+      AOnHistoryAction: TMenuActionEvent;
+      AOnStatusAction: TMenuActionEvent);
     destructor Destroy; override;
 
     procedure SyncEditorState(AEnabled: Boolean);
@@ -55,17 +59,18 @@ uses
 constructor TGitLensMenu.Create(AEnabledEditor, AEnabledDebug: Boolean;
   AOnEditorToggle: TMenuToggleEvent;
   AOnDebugToggle: TMenuToggleEvent;
-  AOnHistoryAction: TMenuActionEvent);
+  AOnHistoryAction: TMenuActionEvent;
+  AOnStatusAction: TMenuActionEvent);
 var
   NTAServices: INTAServices;
   Divisor    : TMenuItem;
-  MenuHistory: TMenuItem;
 begin
   inherited Create;
 
   FOnEditorToggle  := AOnEditorToggle;
   FOnDebugToggle   := AOnDebugToggle;
   FOnHistoryAction := AOnHistoryAction;
+  FOnStatusAction  := AOnStatusAction;
 
   if not Supports(BorlandIDEServices, INTAServices, NTAServices) then
     Exit;
@@ -86,14 +91,23 @@ begin
   Divisor         := TMenuItem.Create(nil);
   Divisor.Caption := '-';
 
-  MenuHistory         := TMenuItem.Create(nil);
-  MenuHistory.Caption := 'Explorar Histórico da Linha Atual (Ctrl+Shift+H)';
-  MenuHistory.OnClick := MenuHistoryClick;
+  FMenuStatus         := TMenuItem.Create(nil);
+  FMenuStatus.Caption := 'Exibir Alterações do Git (Git Changes)';
+  FMenuStatus.OnClick := MenuStatusClick;
 
   FMenuRoot.Add(FMenuEditor);
   FMenuRoot.Add(FMenuDebug);
   FMenuRoot.Add(Divisor);
-  FMenuRoot.Add(MenuHistory);
+  FMenuRoot.Add(FMenuStatus);
+
+  Divisor         := TMenuItem.Create(nil);
+  Divisor.Caption := '-';
+  FMenuRoot.Add(Divisor);
+
+  FMenuStatus         := TMenuItem.Create(nil);
+  FMenuStatus.Caption := 'Explorar Histórico da Linha Atual (Ctrl+Shift+H)';
+  FMenuStatus.OnClick := MenuHistoryClick;
+  FMenuRoot.Add(FMenuStatus);
 
   NTAServices.AddActionMenu('viewsMenu', nil, FMenuRoot, True, True);
 end;
@@ -128,6 +142,12 @@ procedure TGitLensMenu.MenuHistoryClick(Sender: TObject);
 begin
   if Assigned(FOnHistoryAction) then
     FOnHistoryAction;
+end;
+
+procedure TGitLensMenu.MenuStatusClick(Sender: TObject);
+begin
+  if Assigned(FOnStatusAction) then
+    FOnStatusAction;
 end;
 
 procedure TGitLensMenu.SyncEditorState(AEnabled: Boolean);

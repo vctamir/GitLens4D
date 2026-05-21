@@ -27,8 +27,10 @@ type
   TIDEMessenger = class(TInterfacedObject, IIDEMessenger)
   private
     FMsgGroup: IOTAMessageGroup;
+    FFirstShow: Boolean;
     function EnsureGroup(const ASvc: IOTAMessageServices): IOTAMessageGroup;
   public
+    constructor Create;
     procedure ShowMessage(const AMessage: string);
     procedure ShowMessages(const AMessages: TStringList);
     procedure Hide;
@@ -40,6 +42,12 @@ uses
   System.SysUtils;
 
 { TIDEMessenger }
+
+constructor TIDEMessenger.Create;
+begin
+  inherited Create;
+  FFirstShow := True;
+end;
 
 function TIDEMessenger.EnsureGroup(const ASvc: IOTAMessageServices): IOTAMessageGroup;
 begin
@@ -58,9 +66,12 @@ begin
 
   Grp := EnsureGroup(Svc);
 
-  // Exibe a aba apenas na primeira vez; depois apenas atualiza o conteúdo
-  if FMsgGroup <> nil then
+  // Exibe a aba apenas na primeira vez; depois apenas atualiza o conteúdo em background
+  if FFirstShow then
+  begin
     Svc.ShowMessageView(Grp);
+    FFirstShow := False;
+  end;
 
   Svc.ClearMessageGroup(Grp);
   Svc.AddTitleMessage(AMessage, Grp);

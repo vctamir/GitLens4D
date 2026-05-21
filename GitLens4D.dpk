@@ -32,16 +32,23 @@ requires
   rtl;
 
 contains
-  GitLens4D.Interfaces      in 'src\GitLens4D.Interfaces.pas',
-  GitLens4D.Settings        in 'src\GitLens4D.Settings.pas',
-  GitLens4D.Git.PathResolver in 'src\GitLens4D.Git.PathResolver.pas',
-  GitLens4D.Git.Runner      in 'src\GitLens4D.Git.Runner.pas',
-  GitLens4D.Git.BlameParser  in 'src\GitLens4D.Git.BlameParser.pas',
+  GitLens4D.Git.AIService in 'src\GitLens4D.Git.AIService.pas',
+  GitLens4D.Git.BlameParser in 'src\GitLens4D.Git.BlameParser.pas',
   GitLens4D.Git.HistoryParser in 'src\GitLens4D.Git.HistoryParser.pas',
-  GitLens4D.IDE.Menu        in 'src\GitLens4D.IDE.Menu.pas',
+  GitLens4D.Git.PathResolver in 'src\GitLens4D.Git.PathResolver.pas',
+  GitLens4D.Git.Runner in 'src\GitLens4D.Git.Runner.pas',
+  GitLens4D.Git.StatusParser in 'src\GitLens4D.Git.StatusParser.pas',
+  GitLens4D.Git.StatusProvider in 'src\GitLens4D.Git.StatusProvider.pas',
   GitLens4D.IDE.CursorTracker in 'src\GitLens4D.IDE.CursorTracker.pas',
-  GitLens4D.IDE.KeyBinding  in 'src\GitLens4D.IDE.KeyBinding.pas',
-  GitLens4D.IDE.Messenger   in 'src\GitLens4D.IDE.Messenger.pas',
-  GitLens4D.Wizard          in 'src\GitLens4D.Wizard.pas';
+  GitLens4D.IDE.KeyBinding in 'src\GitLens4D.IDE.KeyBinding.pas',
+  GitLens4D.IDE.Menu in 'src\GitLens4D.IDE.Menu.pas',
+  GitLens4D.IDE.Messenger in 'src\GitLens4D.IDE.Messenger.pas',
+  GitLens4D.IDE.StatusDock in 'src\GitLens4D.IDE.StatusDock.pas',
+  GitLens4D.IDE.StatusView in 'src\GitLens4D.IDE.StatusView.pas' {GitStatusView},
+  GitLens4D.IDE.AIConfigView in 'src\GitLens4D.IDE.AIConfigView.pas' {GitAIConfigView},
+  GitLens4D.IDE.DiffView in 'src\GitLens4D.IDE.DiffView.pas' {GitDiffView},
+  GitLens4D.Interfaces in 'src\GitLens4D.Interfaces.pas',
+  GitLens4D.Settings in 'src\GitLens4D.Settings.pas',
+  GitLens4D.Wizard in 'src\GitLens4D.Wizard.pas';
 
 end.

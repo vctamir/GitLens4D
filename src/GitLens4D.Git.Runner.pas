@@ -1,4 +1,4 @@
-﻿unit GitLens4D.Git.Runner;
+unit GitLens4D.Git.Runner;
 
 { ============================================================================
   GitLens4D - Executor de Comandos Git
@@ -12,19 +12,147 @@
 interface
 
 uses
+  System.Classes,
   GitLens4D.Interfaces;
 
 type
   TGitRunner = class(TInterfacedObject, IGitRunner)
   public
     function Execute(const ACommand, ABaseDir: string): string;
+    function GetFileContent(const ARevision, AFile, ABaseDir: string): string;
+    function GetDiff(const AFile, ABaseDir: string): string;
+    function GetRepoRoot(const ABaseDir: string): string;
+    function GetCurrentBranch(const ABaseDir: string): string;
+    function GetBranches(const ABaseDir: string): TStringList;
+    procedure CreateBranch(const ABranchName, ABaseDir: string);
+    procedure CheckoutBranch(const ABranchName, ABaseDir: string);
+    procedure Push(const ABaseDir: string);
+    procedure Pull(const ABaseDir: string);
+    procedure AddFile(const AFile, ABaseDir: string);
+    procedure DiscardChanges(const AFile, ABaseDir: string);
   end;
 
 implementation
 
 uses
   Winapi.Windows,
-  System.SysUtils;
+  System.SysUtils,
+  GitLens4D.Git.PathResolver;
+
+function TGitRunner.GetCurrentBranch(const ABaseDir: string): string;
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" rev-parse --abbrev-ref HEAD', [PathSvc.Resolve]);
+  Result  := Execute(Command, ABaseDir).Trim;
+end;
+
+function TGitRunner.GetBranches(const ABaseDir: string): TStringList;
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+  Raw: string;
+begin
+  Result := TStringList.Create;
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" branch --format="%%(refname:short)"', [PathSvc.Resolve]);
+  Raw := Execute(Command, ABaseDir);
+  Result.Text := Raw.Trim;
+end;
+
+procedure TGitRunner.CreateBranch(const ABranchName, ABaseDir: string);
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" checkout -b "%s"', [PathSvc.Resolve, ABranchName]);
+  Execute(Command, ABaseDir);
+end;
+
+procedure TGitRunner.CheckoutBranch(const ABranchName, ABaseDir: string);
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" checkout "%s"', [PathSvc.Resolve, ABranchName]);
+  Execute(Command, ABaseDir);
+end;
+
+procedure TGitRunner.Push(const ABaseDir: string);
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" push', [PathSvc.Resolve]);
+  Execute(Command, ABaseDir);
+end;
+
+procedure TGitRunner.Pull(const ABaseDir: string);
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" pull', [PathSvc.Resolve]);
+  Execute(Command, ABaseDir);
+end;
+
+procedure TGitRunner.AddFile(const AFile, ABaseDir: string);
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" add "%s"', [PathSvc.Resolve, AFile]);
+  Execute(Command, ABaseDir);
+end;
+
+procedure TGitRunner.DiscardChanges(const AFile, ABaseDir: string);
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  // Desfaz alterações no arquivo (tracked)
+  Command := Format('"%s" checkout -- "%s"', [PathSvc.Resolve, AFile]);
+  Execute(Command, ABaseDir);
+end;
+
+function TGitRunner.GetRepoRoot(const ABaseDir: string): string;
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" rev-parse --show-toplevel', [PathSvc.Resolve]);
+  Result  := Execute(Command, ABaseDir).Trim;
+end;
+
+function TGitRunner.GetFileContent(const ARevision, AFile, ABaseDir: string): string;
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" show %s:"%s"', [PathSvc.Resolve, ARevision, AFile]);
+  Result  := Execute(Command, ABaseDir);
+end;
+
+function TGitRunner.GetDiff(const AFile, ABaseDir: string): string;
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  // git diff HEAD -- <file> mostra as mudanças atuais em relação ao último commit
+  Command := Format('"%s" diff HEAD -- "%s"', [PathSvc.Resolve, AFile]);
+  Result  := Execute(Command, ABaseDir);
+end;
 
 function TGitRunner.Execute(const ACommand, ABaseDir: string): string;
 var

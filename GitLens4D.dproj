@@ -111,16 +111,30 @@
         </DelphiCompile>
         <DCCReference Include="designide.dcp"/>
         <DCCReference Include="rtl.dcp"/>
-        <DCCReference Include="src\GitLens4D.Interfaces.pas"/>
-        <DCCReference Include="src\GitLens4D.Settings.pas"/>
-        <DCCReference Include="src\GitLens4D.Git.PathResolver.pas"/>
-        <DCCReference Include="src\GitLens4D.Git.Runner.pas"/>
+        <DCCReference Include="src\GitLens4D.Git.AIService.pas"/>
         <DCCReference Include="src\GitLens4D.Git.BlameParser.pas"/>
         <DCCReference Include="src\GitLens4D.Git.HistoryParser.pas"/>
-        <DCCReference Include="src\GitLens4D.IDE.Menu.pas"/>
+        <DCCReference Include="src\GitLens4D.Git.PathResolver.pas"/>
+        <DCCReference Include="src\GitLens4D.Git.Runner.pas"/>
+        <DCCReference Include="src\GitLens4D.Git.StatusParser.pas"/>
+        <DCCReference Include="src\GitLens4D.Git.StatusProvider.pas"/>
         <DCCReference Include="src\GitLens4D.IDE.CursorTracker.pas"/>
         <DCCReference Include="src\GitLens4D.IDE.KeyBinding.pas"/>
+        <DCCReference Include="src\GitLens4D.IDE.Menu.pas"/>
         <DCCReference Include="src\GitLens4D.IDE.Messenger.pas"/>
+        <DCCReference Include="src\GitLens4D.IDE.StatusDock.pas"/>
+        <DCCReference Include="src\GitLens4D.IDE.StatusView.pas">
+            <Form>GitStatusView</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="src\GitLens4D.IDE.AIConfigView.pas">
+            <Form>GitAIConfigView</Form>
+        </DCCReference>
+        <DCCReference Include="src\GitLens4D.IDE.DiffView.pas">
+            <Form>GitDiffView</Form>
+        </DCCReference>
+        <DCCReference Include="src\GitLens4D.Interfaces.pas"/>
+        <DCCReference Include="src\GitLens4D.Settings.pas"/>
         <DCCReference Include="src\GitLens4D.Wizard.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
@@ -224,6 +238,12 @@
                 </DeployFile>
                 <DeployFile LocalName="$(BDS)\Redist\osx32\libcgsqlite3.dylib" Class="DependencyModule">
                     <Platform Name="OSX32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="bin\GitLens4D.bpl" Configuration="Release" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>GitLens4D.bpl</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

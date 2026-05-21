@@ -1,4 +1,4 @@
-﻿unit GitLens4D.Wizard;
+unit GitLens4D.Wizard;
 
 { ============================================================================
   GitLens4D - Wizard Principal (Orquestrador)
@@ -11,7 +11,7 @@
   - Responde aos eventos do IDE (menu, teclado, timer).
 
   Para trocar qualquer comportamento (ex: outro parser, outro storage),
-  basta criar uma nova classe que implemente a interface correspondente
+   basta criar uma nova classe que implemente a interface correspondente
   e substituir a instância no construtor, sem tocar neste arquivo.
   ============================================================================ }
 
@@ -38,6 +38,8 @@ type
     FRunner     : IGitRunner;
     FBlameParser: IBlameParser;
     FHistParser : IHistoryParser;
+    FStatusProv : IGitStatusProvider;
+    FAIService   : IAIService;
     FMessenger  : IIDEMessenger;
 
     // Componentes visuais/IDE (owned, não são interfaces)
@@ -48,6 +50,7 @@ type
     procedure OnEditorToggle(ANewState: Boolean);
     procedure OnDebugToggle(ANewState: Boolean);
     procedure OnHistoryAction;
+    procedure OnStatusAction;
     procedure OnCursorChanged(const AFile: string; ALine: Integer);
     function OnIsActive: Boolean;
     procedure OnKeyShortcut;
@@ -81,9 +84,13 @@ uses
   GitLens4D.Git.Runner,
   GitLens4D.Git.BlameParser,
   GitLens4D.Git.HistoryParser,
+  GitLens4D.Git.StatusParser,
+  GitLens4D.Git.StatusProvider,
+  GitLens4D.Git.AIService,
   GitLens4D.Settings,
   GitLens4D.IDE.Messenger,
-  GitLens4D.IDE.KeyBinding;
+  GitLens4D.IDE.KeyBinding,
+  GitLens4D.IDE.StatusDock;
 
 { TGitLens4D }
 
@@ -109,17 +116,22 @@ begin
   PathResolver := TGitPathResolver.Create;
   FGitPath     := PathResolver.Resolve;
 
+  FStatusProv  := TGitStatusProvider.Create(FGitPath, FRunner, TStatusParser.Create);
+  FAIService    := TAIService.Create(FSettings);
+  RegisterStatusWindow(FStatusProv, FRunner, FSettings, FAIService);
+
   // ── Componentes do IDE ───────────────────────────────────────────────
   FMenu := TGitLensMenu.Create(FEnabledEditor, FEnabledDebug,
     OnEditorToggle,
     OnDebugToggle,
-    OnHistoryAction);
+    OnHistoryAction,
+    OnStatusAction);
 
   FTracker := TGitLensCursorTracker.Create(OnCursorChanged, OnIsActive);
 
   if Supports(BorlandIDEServices, IOTAKeyboardServices, KeySvc) then
     FKeyBindIdx := KeySvc.AddKeyboardBinding(
-      TGitLensKeyboardBinding.Create(OnKeyShortcut));
+      TGitLensKeyboardBinding.Create(OnHistoryAction, OnStatusAction));
 end;
 
 destructor TGitLens4D.Destroy;
@@ -240,6 +252,16 @@ begin
     ShowGitHistory(FLastFile, FLastLine);
 end;
 
+procedure TGitLens4D.OnStatusAction;
+begin
+  ShowStatusWindow;
+end;
+
+procedure TGitShortcutSyncProc(const AMessenger: IIDEMessenger; const AMsg: string);
+begin
+  AMessenger.ShowMessage(AMsg);
+end;
+
 procedure TGitLens4D.OnKeyShortcut;
 var
   AFile: string;
@@ -279,7 +301,7 @@ begin
       Raw := Runner.Execute(Comando, DirBase);
       Mensagem := Parser.Parse(Trim(Raw), ALine);
 
-      TThread.Queue(nil,
+      TThread.Synchronize(nil,
         procedure
         begin
           Messenger.ShowMessage(Mensagem);
@@ -319,7 +341,7 @@ begin
       Raw := Runner.Execute(Comando, DirBase);
       Linhas := Parser.Parse(Trim(Raw), ALine);
 
-      TThread.Queue(nil,
+      TThread.Synchronize(nil,
         procedure
         begin
           try

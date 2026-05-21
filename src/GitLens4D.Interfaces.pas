@@ -1,4 +1,4 @@
-﻿unit GitLens4D.Interfaces;
+unit GitLens4D.Interfaces;
 
 { ============================================================================
   GitLens4D - Camada de Contratos (Interfaces)
@@ -24,6 +24,17 @@ type
   IGitRunner = interface
     ['{B2C3D4E5-F6A7-4890-BC12-34567890ABCD}']
     function Execute(const ACommand, ABaseDir: string): string;
+    function GetFileContent(const ARevision, AFile, ABaseDir: string): string;
+    function GetDiff(const AFile, ABaseDir: string): string;
+    function GetRepoRoot(const ABaseDir: string): string;
+    function GetCurrentBranch(const ABaseDir: string): string;
+    function GetBranches(const ABaseDir: string): TStringList;
+    procedure CreateBranch(const ABranchName, ABaseDir: string);
+    procedure CheckoutBranch(const ABranchName, ABaseDir: string);
+    procedure Push(const ABaseDir: string);
+    procedure Pull(const ABaseDir: string);
+    procedure AddFile(const AFile, ABaseDir: string);
+    procedure DiscardChanges(const AFile, ABaseDir: string);
   end;
 
   // ── Contrato: Interpretar saída do "git blame -p" ────────────────────────
@@ -39,11 +50,46 @@ type
     function Parse(const ARawOutput: string; ALine: Integer): TStringList;
   end;
 
+  // ── Estruturas para Status de Arquivos ──────────────────────────────────
+  TGitStatusKind = (skModified, skAdded, skDeleted, skRenamed, skUntracked, skIgnored, skUnknown);
+
+  TGitFileStatus = record
+    FileName: string;
+    Status: TGitStatusKind;
+    Staged: Boolean;
+  end;
+
+  TGitFileStatusArray = array of TGitFileStatus;
+
+  // ── Contrato: Interpretar saída do "git status --porcelain" ──────────────
+  IStatusParser = interface
+    ['{12345678-ABCD-1234-ABCD-1234567890AB}']
+    function Parse(const ARawOutput: string): TGitFileStatusArray;
+  end;
+
+  // ── Contrato: Provedor de Status do Repositório ──────────────────────────
+  IGitStatusProvider = interface
+    ['{87654321-DCBA-4321-DCBA-0987654321BA}']
+    function GetStatus(const ABaseDir: string): TGitFileStatusArray;
+  end;
+
   // ── Contrato: Persistência de configurações ──────────────────────────────
   ISettingsRepository = interface
     ['{E5F6A7B8-C9D0-4123-EF45-67890ABCDEF0}']
     procedure Load(out AEnabledEditor, AEnabledDebug: Boolean);
     procedure Save(AEnabledEditor, AEnabledDebug: Boolean);
+    procedure LoadTaskInfo(out ATaskNum, ATaskDesc: string);
+    procedure SaveTaskInfo(const ATaskNum, ATaskDesc: string);
+    procedure LoadCommitDraft(out ADraft: string);
+    procedure SaveCommitDraft(const ADraft: string);
+    procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang: string; out ATemp: Double; out AMaxTokens: Integer);
+    procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang: string; ATemp: Double; AMaxTokens: Integer);
+  end;
+
+  // ── Contrato: Serviço de IA para mensagens de commit ─────────────────────
+  IAIService = interface
+    ['{67860509-AFC6-4C93-81FE-681BEF473D5C}']
+    function GenerateCommitMessage(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
   end;
 
   // ── Contrato: Exibição de mensagens na aba do IDE ────────────────────────
