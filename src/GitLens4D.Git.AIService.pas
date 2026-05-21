@@ -1,4 +1,4 @@
-﻿unit GitLens4D.Git.AIService;
+unit GitLens4D.Git.AIService;
 
 { ============================================================================
   GitLens4D - Serviço de Integração com IA
@@ -24,9 +24,12 @@ type
     FSettings: ISettingsRepository;
     function CallChatAPI(const AEndpoint, AKey, AModel, LSystem, LUser: string; ATemp: Double; AMaxTokens: Integer): string;
     function CallOllamaLegacy(const AEndpoint, AModel, APrompt: string; ATemp: Double; AMaxTokens: Integer): string;
+    function NormalizeResponse(const AResponse: string): string;
   public
     constructor Create(ASettings: ISettingsRepository);
     function GenerateCommitMessage(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
+    function GeneratePRDescription(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
+    function IsConfigured: Boolean;
   end;
 
 implementation
@@ -37,6 +40,36 @@ constructor TAIService.Create(ASettings: ISettingsRepository);
 begin
   inherited Create;
   FSettings := ASettings;
+end;
+
+function TAIService.IsConfigured: Boolean;
+var
+  LType, LEndpoint, LKey, LModel, LLang: string;
+  LTemp                                : Double;
+  LMaxTokens                           : Integer;
+begin
+  Result := False;
+  if Assigned(FSettings) then
+  begin
+    FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
+    Result := LEndpoint.Trim <> '';
+  end;
+end;
+
+function TAIService.NormalizeResponse(const AResponse: string): string;
+var
+  LRes: string;
+begin
+  // Limpeza de segurança e normalização de quebras de linha (LF -> CRLF)
+  LRes := StringReplace(AResponse, '```', '', [rfReplaceAll]);
+  LRes := StringReplace(LRes, '`', '', [rfReplaceAll]);
+  
+  // Converte LF ou CR isolados para CRLF (padrão Windows/TMemo)
+  LRes := StringReplace(LRes, #13#10, #10, [rfReplaceAll]);
+  LRes := StringReplace(LRes, #13, #10, [rfReplaceAll]);
+  LRes := StringReplace(LRes, #10, sLineBreak, [rfReplaceAll]);
+  
+  Result := LRes.Trim;
 end;
 
 function TAIService.GenerateCommitMessage(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
@@ -59,7 +92,6 @@ begin
     Exit;
   end;
 
-  // Prompt de Sistema: Focado em Automação, Metadados e Formato
   LSystem := 'Você é uma ferramenta técnica de automação Git.' + sLineBreak +
     'PROJETO ATUAL: ' + AProjName + sLineBreak +
     'VERSÃO: ' + AProjVer + sLineBreak +
@@ -69,10 +101,9 @@ begin
     '1. Responda APENAS o texto do commit e o resumo técnico.' + sLineBreak +
     '2. PROIBIDO qualquer introdução, explicação ou Markdown de bloco (```).' + sLineBreak +
     '3. Substitua [tipo] por um dos seguintes: feat, fix, docs, refactor, style, test, perf, chore.'+
-    'Exemplo de como você deve responder (SEMPRE troque [tipo] pela categoria real):' +
+    'Exemplo de como você deve responder:' +
     '[FEAT]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Adicionado novo sistema de logs' + sLineBreak ;
 
-  // Prompt de Usuário: Instruções de substituição e One-Shot real
   LUser := 'DADOS PARA GERAÇÃO:' + sLineBreak +
     '- Task Number: ' + ATaskNum + sLineBreak +
     '- Task Description: ' + ATaskDesc + sLineBreak +
@@ -92,19 +123,62 @@ begin
     else
       LResponse := CallChatAPI(LEndpoint, LKey, LModel, LSystem, LUser, LTemp, LMaxTokens);
 
-    // Limpeza de segurança e normalização de quebras de linha (LF -> CRLF)
-    LResponse := StringReplace(LResponse, '```', '', [rfReplaceAll]);
-    LResponse := StringReplace(LResponse, '`', '', [rfReplaceAll]);
-    
-    // Converte LF ou CR isolados para CRLF (padrão Windows/TMemo)
-    LResponse := StringReplace(LResponse, #13#10, #10, [rfReplaceAll]);
-    LResponse := StringReplace(LResponse, #13, #10, [rfReplaceAll]);
-    LResponse := StringReplace(LResponse, #10, sLineBreak, [rfReplaceAll]);
-
-    Result := LResponse.Trim;
+    Result := NormalizeResponse(LResponse);
   except
     on E: Exception do
       Result := Format('Erro de Conexão: %s' + sLineBreak + 'URL: %s', [E.Message, LEndpoint]);
+  end;
+end;
+
+function TAIService.GeneratePRDescription(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
+var
+  LType, LEndpoint, LKey, LModel, LLang: string;
+  LTemp                                : Double;
+  LMaxTokens                           : Integer;
+  LSystem, LUser                       : string;
+  LResponse                            : string;
+begin
+  Result := '';
+  if not Assigned(FSettings) then Exit;
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
+
+  LSystem := 'Você é um Engenheiro de Software Senior especializado em Pull Requests.' + sLineBreak +
+    'IDIOMA: ' + LLang + sLineBreak +
+    'OBJETIVO: Gerar uma descrição de PR profissional seguindo os padrões do GitHub.' + sLineBreak +
+    'REGRAS:' + sLineBreak +
+    '1. Use Markdown completo.' + sLineBreak +
+    '2. Inclua uma seção de checklist com - [x] para o que foi feito e - [ ] para pendências.' + sLineBreak +
+    '3. Seja técnico e conciso.' + sLineBreak +
+    '4. NÃO use blocos de código (```) na resposta principal.';
+
+  LUser := 'CONTEXTO DO PR:' + sLineBreak +
+    '- Projeto: ' + AProjName + sLineBreak +
+    '- Versão: ' + AProjVer + sLineBreak +
+    '- Task: #' + ATaskNum + ' - ' + ATaskDesc + sLineBreak +
+    '- Diff das mudanças: ' + ADiff + sLineBreak + sLineBreak +
+    'ESTRUTURA SUGERIDA:' + sLineBreak +
+    '# PR: [Título Sugerido]' + sLineBreak +
+    '## 📝 Descrição' + sLineBreak +
+    '[Breve resumo do que este PR resolve]' + sLineBreak +
+    '## 🛠 Alterações Realizadas' + sLineBreak +
+    '[Lista de mudanças técnicas]' + sLineBreak +
+    '## ✅ Checklist' + sLineBreak +
+    '- [x] Implementação concluída' + sLineBreak +
+    '- [x] Testes realizados' + sLineBreak +
+    '- [ ] Documentação atualizada' + sLineBreak +
+    sLineBreak +
+    'Gere a descrição do PR agora:';
+
+  try
+    if SameText(LType, 'Local') and LEndpoint.Contains('11434') then
+      LResponse := CallOllamaLegacy(LEndpoint, LModel, LSystem + sLineBreak + LUser, LTemp, LMaxTokens)
+    else
+      LResponse := CallChatAPI(LEndpoint, LKey, LModel, LSystem, LUser, LTemp, LMaxTokens);
+
+    Result := NormalizeResponse(LResponse);
+  except
+    on E: Exception do
+      Result := 'Erro ao gerar PR: ' + E.Message;
   end;
 end;
 

@@ -56,6 +56,7 @@ type
     chkSelectAll: TCheckBox;
     ImageList1: TImageList;
     lblBranch: TLabel;
+    btnPR: TButton;
     procedure popRefreshClick(Sender: TObject);
     procedure popDiffClick(Sender: TObject);
     procedure btnSuggestClick(Sender: TObject);
@@ -68,6 +69,7 @@ type
     procedure btnPullClick(Sender: TObject);
     procedure chkSelectAllClick(Sender: TObject);
     procedure popDiscardClick(Sender: TObject);
+    procedure btnPRClick(Sender: TObject);
   private
     FProvider  : IGitStatusProvider;
     FRunner    : IGitRunner;
@@ -102,7 +104,8 @@ implementation
 
 uses
   GitLens4D.IDE.AIConfigView,
-  GitLens4D.IDE.DiffView;
+  GitLens4D.IDE.DiffView,
+  GitLens4D.IDE.PRView;
 
 {$R *.dfm}
 
@@ -274,6 +277,34 @@ begin
   end;
 end;
 
+procedure TGitStatusView.btnPRClick(Sender: TObject);
+var
+  LModSvc : IOTAModuleServices;
+  LProject: IOTAProject;
+  LProjName, LProjVer: string;
+begin
+  LProjName := 'Unknown';
+  LProjVer  := '1.0.0';
+
+  if Supports(BorlandIDEServices, IOTAModuleServices, LModSvc) then
+  begin
+    LProject := LModSvc.GetActiveProject;
+    if Assigned(LProject) then
+    begin
+      LProjName := ExtractFileName(LProject.FileName).Replace(ExtractFileExt(LProject.FileName), emptystr, [rfIgnoreCase]);
+      if Assigned(LProject.ProjectOptions) then
+      begin
+        try
+          LProjVer := VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], '1.0.0');
+        except
+        end;
+      end;
+    end;
+  end;
+
+  ShowPRWindow(FRunner, FAIService, FSettings, FProjectDir, edtTaskNum.Text, edtTaskDesc.Text, LProjName, LProjVer);
+end;
+
 procedure TGitStatusView.chkSelectAllClick(Sender: TObject);
 var
   I: Integer;
@@ -404,6 +435,12 @@ begin
   if not Assigned(FAIService) then
   begin
     ShowMessage('AI Service not initialized.');
+    Exit;
+  end;
+
+  if not FAIService.IsConfigured then
+  begin
+    ShowMessage('IA não configurada! Por favor, clique no botão "IA" para configurar o endpoint e o modelo antes de solicitar sugestões.');
     Exit;
   end;
 

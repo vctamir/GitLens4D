@@ -1,4 +1,4 @@
-﻿package GitLens4D;
+package GitLens4D;
 
 {$R *.res}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
@@ -29,9 +29,13 @@
 
 requires
   designide,
-  rtl;
+  rtl,
+  vcl,
+  vclimg,
+  vclie;
 
 contains
+  GitLens4D.Interfaces in 'src\GitLens4D.Interfaces.pas',
   GitLens4D.Git.AIService in 'src\GitLens4D.Git.AIService.pas',
   GitLens4D.Git.BlameParser in 'src\GitLens4D.Git.BlameParser.pas',
   GitLens4D.Git.HistoryParser in 'src\GitLens4D.Git.HistoryParser.pas',
@@ -45,9 +49,9 @@ contains
   GitLens4D.IDE.Messenger in 'src\GitLens4D.IDE.Messenger.pas',
   GitLens4D.IDE.StatusDock in 'src\GitLens4D.IDE.StatusDock.pas',
   GitLens4D.IDE.StatusView in 'src\GitLens4D.IDE.StatusView.pas' {GitStatusView},
+  GitLens4D.IDE.PRView in 'src\GitLens4D.IDE.PRView.pas' {GitPRView},
   GitLens4D.IDE.AIConfigView in 'src\GitLens4D.IDE.AIConfigView.pas' {GitAIConfigView},
   GitLens4D.IDE.DiffView in 'src\GitLens4D.IDE.DiffView.pas' {GitDiffView},
-  GitLens4D.Interfaces in 'src\GitLens4D.Interfaces.pas',
   GitLens4D.Settings in 'src\GitLens4D.Settings.pas',
   GitLens4D.Wizard in 'src\GitLens4D.Wizard.pas';
 

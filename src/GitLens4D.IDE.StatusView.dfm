@@ -62,7 +62,7 @@ object GitStatusView: TGitStatusView
       AlignWithMargins = True
       Left = 5
       Top = 22
-      Width = 120
+      Width = 80
       Height = 21
       Style = csDropDownList
       Anchors = [akLeft, akRight, akBottom]
@@ -80,9 +80,9 @@ object GitStatusView: TGitStatusView
     end
     object btnNewBranch: TButton
       AlignWithMargins = True
-      Left = 130
+      Left = 90
       Top = 3
-      Width = 70
+      Width = 65
       Height = 43
       Align = alRight
       Caption = 'Branch'
@@ -93,9 +93,9 @@ object GitStatusView: TGitStatusView
     end
     object btnPull: TButton
       AlignWithMargins = True
-      Left = 205
+      Left = 160
       Top = 3
-      Width = 70
+      Width = 60
       Height = 43
       Align = alRight
       Caption = 'Pull'
@@ -106,9 +106,9 @@ object GitStatusView: TGitStatusView
     end
     object btnPush: TButton
       AlignWithMargins = True
-      Left = 280
+      Left = 225
       Top = 3
-      Width = 70
+      Width = 60
       Height = 43
       Align = alRight
       Caption = 'Push'
@@ -116,6 +116,19 @@ object GitStatusView: TGitStatusView
       Images = ImageList1
       TabOrder = 2
       OnClick = btnPushClick
+    end
+    object btnPR: TButton
+      AlignWithMargins = True
+      Left = 290
+      Top = 3
+      Width = 60
+      Height = 43
+      Align = alRight
+      Caption = 'PR'
+      ImageIndex = 2
+      Images = ImageList1
+      TabOrder = 5
+      OnClick = btnPRClick
     end
   end
   object pnlCommit: TPanel
@@ -610,7 +623,7 @@ object GitStatusView: TGitStatusView
       00000000000000000028000000C7000000000000000000000000000000000000
       00000000000000000000000000E60000000A0000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000
-      008A000000FF000000FF000000FF000000FF0000008900000000000000000000
+      008A000000FF000000FF000000FF000000FF0000008A00000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000
       00000000004B0000007500000000000000000000000000000000000000000000
@@ -857,14 +870,6 @@ object GitStatusView: TGitStatusView
       FFE07FFFF3E7CFFC003FF809FFE07FFFF3FFCFF8001FF920FFE07FFFF3C3CFF8
       3C1FF1247FF8FFFFF3C3CF007E00E3267FF83FFFF3C3CF007E00E7063FF8007F
       E1C3CF007E00E7073FF8003FE5E7FF007E00E7FC3FF9FC1FE1E787F83C1FE7C0
-      0FF9FF1FE1E787F8001FE7C18FE07E07F3E7A7FC003FE7E647E07E07F3E787FC
-      003FE3CE67E07E07F3E7CFFF00FFF1CE67E07E07F3E7CFFFC3FFF8CC27E07E07
-      F3E7CFFFFFFFFC0427E07E07F3E7CFFFFFFFFE0447FFFFFFFFFFFFFFFFFFFFE1
-      0FFFFFFFFFFFFFFFFFFFFFF01FFFFFFF00000000000000000000000000000000
-      000000000000}
-  end
-end
-0E7073FF8003FE5E7FF007E00E7FC3FF9FC1FE1E787F83C1FE7C0
       0FF9FF1FE1E787F8001FE7C18FE07E07F3E7A7FC003FE7E647E07E07F3E787FC
       003FE3CE67E07E07F3E7CFFF00FFF1CE67E07E07F3E7CFFFC3FFF8CC27E07E07
       F3E7CFFFFFFFFC0427E07E07F3E7CFFFFFFFFE0447FFFFFFFFFFFFFFFFFFFFE1

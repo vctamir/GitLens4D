@@ -35,6 +35,7 @@ type
     procedure Pull(const ABaseDir: string);
     procedure AddFile(const AFile, ABaseDir: string);
     procedure DiscardChanges(const AFile, ABaseDir: string);
+    function GetRemoteUrl(const ABaseDir: string): string;
   end;
 
   // ── Contrato: Interpretar saída do "git blame -p" ────────────────────────
@@ -90,6 +91,8 @@ type
   IAIService = interface
     ['{67860509-AFC6-4C93-81FE-681BEF473D5C}']
     function GenerateCommitMessage(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
+    function GeneratePRDescription(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
+    function IsConfigured: Boolean;
   end;
 
   // ── Contrato: Exibição de mensagens na aba do IDE ────────────────────────

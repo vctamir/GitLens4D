@@ -30,6 +30,7 @@ type
     procedure Pull(const ABaseDir: string);
     procedure AddFile(const AFile, ABaseDir: string);
     procedure DiscardChanges(const AFile, ABaseDir: string);
+    function GetRemoteUrl(const ABaseDir: string): string;
   end;
 
 implementation
@@ -129,6 +130,16 @@ begin
   // Desfaz alterações no arquivo (tracked)
   Command := Format('"%s" checkout -- "%s"', [PathSvc.Resolve, AFile]);
   Execute(Command, ABaseDir);
+end;
+
+function TGitRunner.GetRemoteUrl(const ABaseDir: string): string;
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" config --get remote.origin.url', [PathSvc.Resolve]);
+  Result  := Execute(Command, ABaseDir).Trim;
 end;
 
 function TGitRunner.GetRepoRoot(const ABaseDir: string): string;
