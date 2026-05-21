@@ -62,31 +62,53 @@ object GitStatusView: TGitStatusView
       AlignWithMargins = True
       Left = 5
       Top = 22
-      Width = 166
+      Width = 120
       Height = 21
       Style = csDropDownList
-      Anchors = [akRight, akBottom]
+      Anchors = [akLeft, akRight, akBottom]
       TabOrder = 0
       OnChange = cbBranchesChange
     end
+    object chkSelectAll: TCheckBox
+      Left = 5
+      Top = 4
+      Width = 81
+      Height = 17
+      Caption = 'Select All'
+      TabOrder = 3
+      OnClick = chkSelectAllClick
+    end
     object btnNewBranch: TButton
       AlignWithMargins = True
-      Left = 177
+      Left = 130
       Top = 3
-      Width = 88
+      Width = 70
       Height = 43
       Align = alRight
-      Caption = 'New Branch'
+      Caption = 'Branch'
       ImageIndex = 3
       Images = ImageList1
       TabOrder = 1
       OnClick = btnNewBranchClick
     end
+    object btnPull: TButton
+      AlignWithMargins = True
+      Left = 205
+      Top = 3
+      Width = 70
+      Height = 43
+      Align = alRight
+      Caption = 'Pull'
+      ImageIndex = 4
+      Images = ImageList1
+      TabOrder = 4
+      OnClick = btnPullClick
+    end
     object btnPush: TButton
       AlignWithMargins = True
-      Left = 271
+      Left = 280
       Top = 3
-      Width = 80
+      Width = 70
       Height = 43
       Align = alRight
       Caption = 'Push'
