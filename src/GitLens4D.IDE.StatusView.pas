@@ -261,9 +261,17 @@ end;
 procedure TGitStatusView.btnPullClick(Sender: TObject);
 begin
   CheckUnsavedFiles;
-  FRunner.Pull(FProjectDir);
-  RefreshStatus;
-  ShowMessage('Pull realizado!');
+  try
+    FRunner.Pull(FProjectDir);
+    RefreshStatus;
+    ShowMessage('Pull realizado com sucesso!');
+  except
+    on E: Exception do
+    begin
+      RefreshStatus;
+      ShowMessage(E.Message);
+    end;
+  end;
 end;
 
 procedure TGitStatusView.chkSelectAllClick(Sender: TObject);

@@ -96,10 +96,18 @@ procedure TGitRunner.Pull(const ABaseDir: string);
 var
   Command: string;
   PathSvc: IGitPathResolver;
+  LOutput: string;
 begin
   PathSvc := TGitPathResolver.Create;
   Command := Format('"%s" pull', [PathSvc.Resolve]);
-  Execute(Command, ABaseDir);
+  LOutput := Execute(Command, ABaseDir);
+  
+  if (Pos('CONFLICT', LOutput) > 0) or (Pos('Automatic merge failed', LOutput) > 0) then
+  begin
+    Execute(Format('"%s" merge --abort', [PathSvc.Resolve]), ABaseDir);
+    raise Exception.Create('Conflito detectado durante o Pull!' + sLineBreak + 
+                           'A operação foi abortada automaticamente para evitar inconsistências no seu código.');
+  end;
 end;
 
 procedure TGitRunner.AddFile(const AFile, ABaseDir: string);
