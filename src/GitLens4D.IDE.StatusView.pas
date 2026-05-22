@@ -295,8 +295,19 @@ begin
       if Assigned(LProject.ProjectOptions) then
       begin
         try
-          LProjVer := VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], '1.0.0');
+          // No Delphi Tokyo, campos individuais são mais garantidos via OTA
+          LProjVer := VarToStrDef(LProject.ProjectOptions.Values['MajorVersion'], '1') + '.' +
+                      VarToStrDef(LProject.ProjectOptions.Values['MinorVersion'], '0') + '.' +
+                      VarToStrDef(LProject.ProjectOptions.Values['Release'], '0') + '.' +
+                      VarToStrDef(LProject.ProjectOptions.Values['Build'], '0');
+          
+          if (LProjVer = '1.0.0.0') or (LProjVer = '0.0.0.0') then
+          begin
+            if VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], '') <> '' then
+              LProjVer := VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], LProjVer);
+          end;
         except
+          LProjVer := '1.0.0.0';
         end;
       end;
     end;
@@ -453,7 +464,7 @@ begin
   end;
 
   LProjName := 'Unknown Project';
-  LProjVer  := '1.0.0.0';
+  LProjVer  := '';
 
   if Supports(BorlandIDEServices, IOTAModuleServices, LModSvc) then
   begin
@@ -464,15 +475,20 @@ begin
       if Assigned(LProject.ProjectOptions) then
       begin
         try
-          LProjVer := VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], '');
-          if LProjVer = '' then
+          // No Delphi Tokyo, campos individuais são mais garantidos via OTA
+          LProjVer := VarToStrDef(LProject.ProjectOptions.Values['MajorVersion'], '1') + '.' +
+                      VarToStrDef(LProject.ProjectOptions.Values['MinorVersion'], '0') + '.' +
+                      VarToStrDef(LProject.ProjectOptions.Values['Release'], '0') + '.' +
+                      VarToStrDef(LProject.ProjectOptions.Values['Build'], '0');
+          
+          // Se resultar no padrão e existir FileVersion preenchido, tenta usá-lo
+          if (LProjVer = '1.0.0.0') or (LProjVer = '0.0.0.0') then
           begin
-            LProjVer := VarToStrDef(LProject.ProjectOptions.Values['MajorVersion'], '1') + '.' +
-              VarToStrDef(LProject.ProjectOptions.Values['MinorVersion'], '0') + '.' +
-              VarToStrDef(LProject.ProjectOptions.Values['Release'], '0') + '.' +
-              VarToStrDef(LProject.ProjectOptions.Values['Build'], '0');
+            if VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], '') <> '' then
+              LProjVer := VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], LProjVer);
           end;
         except
+          LProjVer := '1.0.0.0';
         end;
       end;
     end;
