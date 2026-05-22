@@ -33,6 +33,9 @@ var
   Partes     : TArray<string>;
   I          : Integer;
   LCurrentPatch: TStringList;
+  HunkInfo   : string;
+  LBefore, LAfter: string;
+  P1, P2     : Integer;
 begin
   SetLength(Result, 0);
   if (ARawOutput = '') or (Pos('fatal:', LowerCase(ARawOutput)) > 0) then
@@ -75,6 +78,27 @@ begin
         if (StrAtual.StartsWith('diff')) or (StrAtual.StartsWith('index')) or
            (StrAtual.StartsWith('---')) or (StrAtual.StartsWith('+++')) then
           Continue;
+
+        // Traduz cabeçalho de hunk @@ -X,Y +A,B @@ para humano
+        if StrAtual.StartsWith('@@') then
+        begin
+          HunkInfo := StrAtual.Replace('@@', '', [rfReplaceAll]).Trim;
+          Partes := HunkInfo.Split([' ']);
+          if Length(Partes) >= 2 then
+          begin
+             LBefore := Partes[0].Replace('-', '');
+             LAfter  := Partes[1].Replace('+', '');
+
+             // Extrai apenas o número da linha inicial (antes da vírgula)
+             P1 := Pos(',', LBefore);
+             if P1 > 0 then LBefore := Copy(LBefore, 1, P1-1);
+
+             P2 := Pos(',', LAfter);
+             if P2 > 0 then LAfter := Copy(LAfter, 1, P2-1);
+
+             StrAtual := UTF8ToString(Format('@@ ANTES: Linha %s | DEPOIS: Linha %s', [LBefore, LAfter]));
+          end;
+        end;
 
         LCurrentPatch.Add(StrAtual);
       end;

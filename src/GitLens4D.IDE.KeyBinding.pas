@@ -1,7 +1,7 @@
-﻿unit GitLens4D.IDE.KeyBinding;
+unit GitLens4D.IDE.KeyBinding;
 
 { ============================================================================
-  GitLens4D - Atalho de Teclado (Ctrl+Shift+H)
+  GitLens4D - Atalho de Teclado
   Princípio: Single Responsibility (SRP)
 
   Responsabilidade única: registrar o binding de teclado no IDE e, quando
@@ -21,6 +21,8 @@ type
   private
     FOnHistory: TKeyShortcutEvent;
     FOnStatus: TKeyShortcutEvent;
+    FShortcutHist: string;
+    FShortcutChanges: string;
     procedure ExecuteHistoryShortcut(const Context: IOTAKeyContext;
       KeyCode: TShortCut;
       var BindingResult: TKeyBindingResult);
@@ -28,7 +30,7 @@ type
       KeyCode: TShortCut;
       var BindingResult: TKeyBindingResult);
   public
-    constructor Create(AOnHistory, AOnStatus: TKeyShortcutEvent);
+    constructor Create(AOnHistory, AOnStatus: TKeyShortcutEvent; const AHist, AChanges: string);
     function GetBindingType: TBindingType;
     function GetDisplayName: string;
     function GetName: string;
@@ -42,11 +44,13 @@ uses
 
 { TGitLensKeyboardBinding }
 
-constructor TGitLensKeyboardBinding.Create(AOnHistory, AOnStatus: TKeyShortcutEvent);
+constructor TGitLensKeyboardBinding.Create(AOnHistory, AOnStatus: TKeyShortcutEvent; const AHist, AChanges: string);
 begin
   inherited Create;
   FOnHistory := AOnHistory;
   FOnStatus  := AOnStatus;
+  FShortcutHist := AHist;
+  FShortcutChanges := AChanges;
 end;
 
 function TGitLensKeyboardBinding.GetBindingType: TBindingType;
@@ -64,13 +68,23 @@ begin
   Result := 'vcTamir.QSGitLens.Keyboard';
 end;
 
-procedure TGitLensKeyboardBinding.BindKeyboard(
-  const BindingServices: IOTAKeyBindingServices);
+procedure TGitLensKeyboardBinding.BindKeyboard(const BindingServices: IOTAKeyBindingServices);
+var
+  LSHist, LSChanges: TShortcut;
 begin
-  BindingServices.AddKeyBinding([TextToShortCut('Ctrl+Shift+H')],
-    ExecuteHistoryShortcut, nil);
-  BindingServices.AddKeyBinding([TextToShortCut('Ctrl+Alt+G')],
-    ExecuteStatusShortcut, nil);
+  if FShortcutHist <> '' then
+  begin
+    LSHist := TextToShortCut(FShortcutHist);
+    if LSHist <> 0 then
+      BindingServices.AddKeyBinding([LSHist], ExecuteHistoryShortcut, nil);
+  end;
+
+  if FShortcutChanges <> '' then
+  begin
+    LSChanges := TextToShortCut(FShortcutChanges);
+    if LSChanges <> 0 then
+      BindingServices.AddKeyBinding([LSChanges], ExecuteStatusShortcut, nil);
+  end;
 end;
 
 procedure TGitLensKeyboardBinding.ExecuteHistoryShortcut(

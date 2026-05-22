@@ -16,6 +16,7 @@ uses
   System.SysUtils,
   System.Variants,
   System.Classes,
+  System.StrUtils,
   Vcl.Graphics,
   Vcl.Controls,
   Vcl.Forms,
@@ -27,7 +28,9 @@ uses
   Vcl.Clipbrd,
   GitLens4D.Interfaces,
   ToolsAPI,
-  System.IOUtils, System.ImageList, Vcl.ImgList;
+  System.IOUtils,
+  System.ImageList,
+  Vcl.ImgList;
 
 type
   TGitStatusView = class(TForm)
@@ -57,6 +60,7 @@ type
     lblBranch: TLabel;
     btnPR: TButton;
     chkSelectAll: TCheckBox;
+    Splitter1: TSplitter;
     procedure popRefreshClick(Sender: TObject);
     procedure popDiffClick(Sender: TObject);
     procedure btnSuggestClick(Sender: TObject);
@@ -87,6 +91,7 @@ type
     procedure LoadSettings;
     procedure SaveSettings;
     function GetSelectedRelativeFile: string;
+    function GetRelativeFile(AItem: TListItem): string;
     procedure UpdateCommitMsg(const AText: string);
     procedure EnableSuggest(AEnabled: Boolean);
   protected
@@ -94,6 +99,7 @@ type
   public
     constructor Create(AOwner: TComponent; AProvider: IGitStatusProvider; ARunner: IGitRunner;
       ASettings: ISettingsRepository; AAIService: IAIService; const AProjectDir: string); reintroduce;
+    destructor Destroy; override;
     procedure UpdateList(const AFiles: TGitFileStatusArray);
   end;
 
@@ -105,7 +111,8 @@ implementation
 uses
   GitLens4D.IDE.AIConfigView,
   GitLens4D.IDE.DiffView,
-  GitLens4D.IDE.PRView;
+  GitLens4D.IDE.PRView,
+  GitLens4D.Git.ProjectProvider;
 
 {$R *.dfm}
 
@@ -133,6 +140,12 @@ begin
   LoadSettings;
   RefreshStatus;
   RefreshBranches;
+end;
+
+destructor TGitStatusView.Destroy;
+begin
+  SaveSettings;
+  inherited;
 end;
 
 procedure TGitStatusView.DoShow;
@@ -168,7 +181,7 @@ var
 begin
   if Supports(BorlandIDEServices, IOTAModuleServices, ModSvc) then
   begin
-    if MessageDlg('Deseja salvar todas as alterações pendentes no IDE antes de prosseguir?',
+    if MessageDlg(UTF8ToString('Deseja salvar todas as alterações pendentes no IDE antes de prosseguir?'),
       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
     begin
       ModSvc.SaveAll;
@@ -178,15 +191,16 @@ end;
 
 procedure TGitStatusView.CheckPendingChanges;
 var
-  AFiles: TGitFileStatusArray;
-  I: Integer;
+  AFiles    : TGitFileStatusArray;
+  I         : Integer;
   HasChanges: Boolean;
 begin
-  if not Assigned(FProvider) then Exit;
-  
-  AFiles := FProvider.GetStatus(FProjectDir);
+  if not Assigned(FProvider) then
+    Exit;
+
+  AFiles     := FProvider.GetStatus(FProjectDir);
   HasChanges := False;
-  for I := 0 to High(AFiles) do
+  for I      := 0 to High(AFiles) do
   begin
     if AFiles[I].Status in [skModified, skAdded, skDeleted, skRenamed] then
     begin
@@ -197,10 +211,10 @@ begin
 
   if HasChanges then
   begin
-    if MessageDlg('Existem arquivos com mudanças não comitadas (Modified/Deleted).' + sLineBreak + 
-                  'Deseja fazer o commit antes de prosseguir?', mtWarning, [mbYes, mbNo], 0) = mrYes then
+    if MessageDlg(UTF8ToString('Existem arquivos com mudanças não comitadas (Modified/Deleted).') + sLineBreak +
+      UTF8ToString('Deseja fazer o commit antes de prosseguir?'), mtWarning, [mbYes, mbNo], 0) = mrYes then
     begin
-      Abort; 
+      Abort;
     end;
   end;
 end;
@@ -209,6 +223,7 @@ procedure TGitStatusView.RefreshBranches;
 var
   BranchList: TStringList;
   Current   : string;
+  AheadCount: Integer;
 begin
   if not Assigned(FRunner) then
     Exit;
@@ -218,6 +233,17 @@ begin
     cbBranches.Items.Assign(BranchList);
     Current              := FRunner.GetCurrentBranch(FProjectDir);
     cbBranches.ItemIndex := cbBranches.Items.IndexOf(Current);
+    
+    // Atualiza contador de Push
+    try
+      AheadCount := FRunner.GetAheadCount(FProjectDir);
+      if AheadCount > 0 then
+        btnPush.Caption := Format('Push (%d)', [AheadCount])
+      else
+        btnPush.Caption := 'Push';
+    except
+      btnPush.Caption := 'Push';
+    end;
   finally
     BranchList.Free;
   end;
@@ -251,6 +277,7 @@ begin
   begin
     FRunner.CheckoutBranch(cbBranches.Items[cbBranches.ItemIndex], FProjectDir);
     RefreshStatus;
+    RefreshBranches;
   end;
 end;
 
@@ -258,6 +285,8 @@ procedure TGitStatusView.btnPushClick(Sender: TObject);
 begin
   CheckUnsavedFiles;
   FRunner.Push(FProjectDir);
+  RefreshStatus;
+  RefreshBranches;
   ShowMessage('Push realizado!');
 end;
 
@@ -267,11 +296,13 @@ begin
   try
     FRunner.Pull(FProjectDir);
     RefreshStatus;
-    ShowMessage('Pull realizado com sucesso!');
+    RefreshBranches;
+    ShowMessage(UTF8ToString('Pull realizado com sucesso!'));
   except
     on E: Exception do
     begin
       RefreshStatus;
+      RefreshBranches;
       ShowMessage(E.Message);
     end;
   end;
@@ -279,41 +310,10 @@ end;
 
 procedure TGitStatusView.btnPRClick(Sender: TObject);
 var
-  LModSvc : IOTAModuleServices;
-  LProject: IOTAProject;
-  LProjName, LProjVer: string;
+  LMetadata: TGitProjectMetadata;
 begin
-  LProjName := 'Unknown';
-  LProjVer  := '1.0.0';
-
-  if Supports(BorlandIDEServices, IOTAModuleServices, LModSvc) then
-  begin
-    LProject := LModSvc.GetActiveProject;
-    if Assigned(LProject) then
-    begin
-      LProjName := ExtractFileName(LProject.FileName).Replace(ExtractFileExt(LProject.FileName), emptystr, [rfIgnoreCase]);
-      if Assigned(LProject.ProjectOptions) then
-      begin
-        try
-          // No Delphi Tokyo, campos individuais são mais garantidos via OTA
-          LProjVer := VarToStrDef(LProject.ProjectOptions.Values['MajorVersion'], '1') + '.' +
-                      VarToStrDef(LProject.ProjectOptions.Values['MinorVersion'], '0') + '.' +
-                      VarToStrDef(LProject.ProjectOptions.Values['Release'], '0') + '.' +
-                      VarToStrDef(LProject.ProjectOptions.Values['Build'], '0');
-          
-          if (LProjVer = '1.0.0.0') or (LProjVer = '0.0.0.0') then
-          begin
-            if VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], '') <> '' then
-              LProjVer := VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], LProjVer);
-          end;
-        except
-          LProjVer := '1.0.0.0';
-        end;
-      end;
-    end;
-  end;
-
-  ShowPRWindow(FRunner, FAIService, FSettings, FProjectDir, edtTaskNum.Text, edtTaskDesc.Text, LProjName, LProjVer);
+  LMetadata := TGitProjectProvider.Create.GetMetadata;
+  ShowPRWindow(FRunner, FAIService, FSettings, FProjectDir, edtTaskNum.Text, edtTaskDesc.Text, LMetadata.ProjectName, LMetadata.ProjectVersion);
 end;
 
 procedure TGitStatusView.chkSelectAllClick(Sender: TObject);
@@ -322,7 +322,7 @@ var
 begin
   lstFiles.Items.BeginUpdate;
   try
-    for I := 0 to lstFiles.Items.Count - 1 do
+    for I                       := 0 to lstFiles.Items.Count - 1 do
       lstFiles.Items[I].Checked := chkSelectAll.Checked;
   finally
     lstFiles.Items.EndUpdate;
@@ -337,14 +337,14 @@ end;
 procedure TGitStatusView.LoadSettings;
 var
   LTaskNum, LTaskDesc: string;
-  LDraft: string;
+  LDraft             : string;
 begin
   if Assigned(FSettings) then
   begin
     FSettings.LoadTaskInfo(LTaskNum, LTaskDesc);
     edtTaskNum.Text  := LTaskNum;
     edtTaskDesc.Text := LTaskDesc;
-    
+
     FSettings.LoadCommitDraft(LDraft);
     if LDraft <> '' then
       memCommitMsg.Text := LDraft;
@@ -352,31 +352,48 @@ begin
 end;
 
 procedure TGitStatusView.SaveSettings;
+var
+  I: Integer;
+  LSelected: TStringList;
 begin
   if Assigned(FSettings) then
   begin
     FSettings.SaveTaskInfo(edtTaskNum.Text, edtTaskDesc.Text);
     FSettings.SaveCommitDraft(memCommitMsg.Text);
+
+    // Salva quais arquivos estão marcados
+    LSelected := TStringList.Create;
+    try
+      for I := 0 to lstFiles.Items.Count - 1 do
+      begin
+        if lstFiles.Items[I].Checked then
+          LSelected.Add(GetRelativeFile(lstFiles.Items[I]));
+      end;
+      FSettings.SaveSelectedFiles(LSelected.CommaText);
+    finally
+      LSelected.Free;
+    end;
   end;
 end;
 
 procedure TGitStatusView.btnCommitClick(Sender: TObject);
 var
-  Msg: string;
-  I: Integer;
+  Msg     : string;
+  I       : Integer;
   FilePath: string;
+  LOutput : string;
 begin
   CheckUnsavedFiles;
-  
+
   // 1. Limpa o stage atual (git reset) para garantir commit seletivo
   FRunner.Execute('git reset', FProjectDir);
-  
+
   // 2. Adiciona apenas o que o usuário marcou
   for I := 0 to lstFiles.Items.Count - 1 do
   begin
     if lstFiles.Items[I].Checked then
     begin
-      FilePath := lstFiles.Items[I].SubItems[0].Replace('.\', '', [rfReplaceAll]) + lstFiles.Items[I].Caption;
+      FilePath := GetRelativeFile(lstFiles.Items[I]);
       FRunner.AddFile(FilePath, FProjectDir);
     end;
   end;
@@ -384,44 +401,60 @@ begin
   Msg := Trim(memCommitMsg.Text);
   if Msg = '' then
   begin
-    ShowMessage('Por favor, informe uma mensagem de commit.');
+    ShowMessage(UTF8ToString('Por favor, informe uma mensagem de commit.'));
     Exit;
   end;
 
   // 3. Comita apenas o que foi adicionado (sem o -a)
-  FRunner.Execute(Format('git commit -m "%s"', [Msg]), FProjectDir);
+  LOutput := FRunner.Execute(Format('git commit -m "%s"', [Msg]), FProjectDir);
   
+  if (Pos('error', LOutput) > 0) or (Pos('fatal', LOutput) > 0) then
+  begin
+    ShowMessage(UTF8ToString('Erro ao realizar commit:') + sLineBreak + LOutput);
+    Exit;
+  end;
+
   memCommitMsg.Clear;
   if Assigned(FSettings) then
   begin
     FSettings.SaveTaskInfo(edtTaskNum.Text, edtTaskDesc.Text);
     FSettings.SaveCommitDraft(''); // Limpa rascunho após commit
+    FSettings.SaveSelectedFiles(''); // Limpa seleção após commit
   end;
-  
+
   RefreshStatus;
-  ShowMessage('Commit realizado com sucesso!');
+  RefreshBranches;
+  ShowMessage(UTF8ToString('Commit realizado com sucesso!'));
 end;
 
 function TGitStatusView.GetSelectedRelativeFile: string;
+begin
+  Result := GetRelativeFile(lstFiles.Selected);
+end;
+
+function TGitStatusView.GetRelativeFile(AItem: TListItem): string;
 var
   LPath: string;
 begin
   Result := '';
-  if lstFiles.Selected = nil then
+  if AItem = nil then
     Exit;
 
-  LPath := lstFiles.Selected.SubItems[0];
+  LPath := AItem.SubItems[0];
   // Garante que o path termine com barra antes de concatenar o nome do arquivo
-  if not LPath.EndsWith('\') and not LPath.EndsWith('/') then
-    LPath := LPath + '\';
+  if (LPath <> '') and (LPath <> '.\') and (LPath <> './') then
+  begin
+    if not LPath.EndsWith('\') and not LPath.EndsWith('/') then
+      LPath := LPath + '\';
+  end;
 
   if (LPath = '.\') or (LPath = './') then
     LPath := '';
 
-  Result := LPath + lstFiles.Selected.Caption;
+  Result := LPath + AItem.Caption;
   Result := StringReplace(Result, '\', '/', [rfReplaceAll]);
-  
-  // Remove prefixo ./ se existir, para o git diff ser mais limpo
+
+  // Remove prefixo ./ se existir, para o git ser mais limpo
   if Result.StartsWith('./') then
     Delete(Result, 1, 2);
 end;
@@ -445,10 +478,8 @@ procedure TGitStatusView.btnSuggestClick(Sender: TObject);
 var
   LDiff              : string;
   LTaskNum, LTaskDesc: string;
-  LProjName, LProjVer: string;
-  LModSvc            : IOTAModuleServices;
-  LProject           : IOTAProject;
   LView              : TGitStatusView;
+  LMetadata          : TGitProjectMetadata;
 begin
   SaveSettings;
   if not Assigned(FAIService) then
@@ -459,40 +490,11 @@ begin
 
   if not FAIService.IsConfigured then
   begin
-    ShowMessage('IA não configurada! Por favor, clique no botão "IA" para configurar o endpoint e o modelo antes de solicitar sugestões.');
+    ShowMessage(UTF8ToString('IA não configurada! Por favor, clique no botão "IA" para configurar o endpoint e o modelo antes de solicitar sugestões.'));
     Exit;
   end;
 
-  LProjName := 'Unknown Project';
-  LProjVer  := '';
-
-  if Supports(BorlandIDEServices, IOTAModuleServices, LModSvc) then
-  begin
-    LProject := LModSvc.GetActiveProject;
-    if Assigned(LProject) then
-    begin
-      LProjName := ExtractFileName(LProject.FileName).Replace(ExtractFileExt(LProject.FileName),emptystr,[rfIgnoreCase]);
-      if Assigned(LProject.ProjectOptions) then
-      begin
-        try
-          // No Delphi Tokyo, campos individuais são mais garantidos via OTA
-          LProjVer := VarToStrDef(LProject.ProjectOptions.Values['MajorVersion'], '1') + '.' +
-                      VarToStrDef(LProject.ProjectOptions.Values['MinorVersion'], '0') + '.' +
-                      VarToStrDef(LProject.ProjectOptions.Values['Release'], '0') + '.' +
-                      VarToStrDef(LProject.ProjectOptions.Values['Build'], '0');
-          
-          // Se resultar no padrão e existir FileVersion preenchido, tenta usá-lo
-          if (LProjVer = '1.0.0.0') or (LProjVer = '0.0.0.0') then
-          begin
-            if VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], '') <> '' then
-              LProjVer := VarToStrDef(LProject.ProjectOptions.Values['FileVersion'], LProjVer);
-          end;
-        except
-          LProjVer := '1.0.0.0';
-        end;
-      end;
-    end;
-  end;
+  LMetadata := TGitProjectProvider.Create.GetMetadata;
 
   LTaskNum  := edtTaskNum.Text;
   LTaskDesc := edtTaskDesc.Text;
@@ -502,19 +504,19 @@ begin
   LDiff := FRunner.Execute('git diff HEAD', FProjectDir);
   if LDiff.Trim = '' then
   begin
-    ShowMessage('Não há alterações detectadas para sugerir uma mensagem.');
+    ShowMessage(UTF8ToString('Não há alterações detectadas para sugerir uma mensagem.'));
     EnableSuggest(True);
     Exit;
   end;
 
-  LView := Self; 
+  LView := Self;
   TThread.CreateAnonymousThread(
     procedure
     var
       LSuggestion: string;
     begin
       try
-        LSuggestion := FAIService.GenerateCommitMessage(LTaskNum, LTaskDesc, LDiff, LProjName, LProjVer);
+        LSuggestion := FAIService.GenerateCommitMessage(LTaskNum, LTaskDesc, LDiff, LMetadata.ProjectName, LMetadata.ProjectVersion);
 
         TThread.Synchronize(nil,
           procedure
@@ -534,7 +536,7 @@ begin
             begin
               if Assigned(LView) then
               begin
-                LView.UpdateCommitMsg('Erro: ' + LSuggestion);
+                LView.UpdateCommitMsg(UTF8ToString('Erro: ') + LSuggestion);
                 LView.EnableSuggest(True);
               end;
             end);
@@ -556,38 +558,57 @@ var
   Item     : TListItem;
   LPath    : string;
   LFileName: string;
+  LSelected: TStringList;
+  LRelFile : string;
+  LSavedStr: string;
 begin
-  lstFiles.Items.BeginUpdate;
+  LSelected := TStringList.Create;
   try
-    lstFiles.Items.Clear;
-    for I := 0 to High(AFiles) do
+    if Assigned(FSettings) then
     begin
-      Item         := lstFiles.Items.Add;
-      LFileName    := FProjectDir + AFiles[I].FileName.Replace('/', '\', [rfReplaceAll]);
-      Item.Caption := ExtractFileName(LFileName);
-      LPath        := ExtractFilePath(LFileName).Replace(FProjectDir, '.\', [rfIgnoreCase]).Trim(['\']);
-      if LPath = '' then
-        LPath := '.\';
-      Item.SubItems.Add(LPath);
+      FSettings.LoadSelectedFiles(LSavedStr);
+      LSelected.CommaText := LSavedStr;
+    end;
 
-      case AFiles[I].Status of
-        skModified: Item.SubItems.Add('Modified');
-        skAdded: Item.SubItems.Add('Added');
-        skDeleted: Item.SubItems.Add('Deleted');
-        skUntracked: Item.SubItems.Add('Untracked');
-        skRenamed: Item.SubItems.Add('Renamed');
-      else
-          Item.SubItems.Add('Unknown');
+    lstFiles.Items.BeginUpdate;
+    try
+      lstFiles.Items.Clear;
+      for I := 0 to High(AFiles) do
+      begin
+        Item         := lstFiles.Items.Add;
+        LFileName    := FProjectDir + AFiles[I].FileName.Replace('/', '\', [rfReplaceAll]);
+        Item.Caption := ExtractFileName(LFileName);
+        LPath        := ExtractFilePath(LFileName).Replace(FProjectDir, '.\', [rfIgnoreCase]).Trim(['\']);
+        if LPath = '' then
+          LPath := '.\';
+        Item.SubItems.Add(LPath);
+
+        case AFiles[I].Status of
+          skModified: Item.SubItems.Add('Modified');
+          skAdded: Item.SubItems.Add('Added');
+          skDeleted: Item.SubItems.Add('Deleted');
+          skUntracked: Item.SubItems.Add('Untracked');
+          skRenamed: Item.SubItems.Add('Renamed');
+        else
+            Item.SubItems.Add('Unknown');
+        end;
+
+        // Armazena o tipo de status para uso posterior (ex: Diff)
+        Item.Data := Pointer(AFiles[I].Status);
+
+        if AFiles[I].Staged then
+          Item.SubItems[Item.SubItems.Count - 1] := Item.SubItems[Item.SubItems.Count - 1] + ' (Staged)';
+
+        // Restaura a seleção se o arquivo estava marcado
+        LRelFile := GetRelativeFile(Item);
+        if LSelected.IndexOf(LRelFile) >= 0 then
+          Item.Checked := True;
       end;
-      
-      // Armazena o tipo de status para uso posterior (ex: Diff)
-      Item.Data := Pointer(AFiles[I].Status);
-
-      if AFiles[I].Staged then
-        Item.SubItems[Item.SubItems.Count - 1] := Item.SubItems[Item.SubItems.Count - 1] + ' (Staged)';
+    finally
+      lstFiles.Items.EndUpdate;
     end;
   finally
-    lstFiles.Items.EndUpdate;
+    LSelected.Free;
   end;
 end;
 
@@ -603,8 +624,9 @@ var
   LDiffText    : string;
   LStatus      : TGitStatusKind;
 begin
-  if lstFiles.Selected = nil then Exit;
-  
+  if lstFiles.Selected = nil then
+    Exit;
+
   LRelativeFile := GetSelectedRelativeFile;
   if LRelativeFile = '' then
     Exit;
@@ -620,12 +642,13 @@ begin
       if LDiffText.Trim = '' then
       begin
         LDiffText := '--- /dev/null' + sLineBreak +
-                     '+++ b/' + LRelativeFile + sLineBreak +
-                     '@@ -0,0 +1 @@' + sLineBreak +
-                     '+' + StringReplace(TFile.ReadAllText(FProjectDir + LRelativeFile.Replace('/', '\')), sLineBreak, sLineBreak + '+', [rfReplaceAll]);
+          '+++ b/' + LRelativeFile + sLineBreak +
+          '@@ -0,0 +1 @@' + sLineBreak +
+          '+' + StringReplace(TFile.ReadAllText(FProjectDir + LRelativeFile.Replace('/', '\')), sLineBreak, sLineBreak + '+', [rfReplaceAll]);
       end;
     except
-      on E: Exception do LDiffText := 'Erro ao ler arquivo untracked: ' + E.Message;
+      on E: Exception do
+        LDiffText := UTF8ToString('Erro ao ler arquivo untracked: ') + E.Message;
     end;
   end
   else
@@ -635,7 +658,7 @@ begin
 
   if LDiffText.Trim = '' then
   begin
-    ShowMessage('Nenhuma diferença textual detectada.');
+    ShowMessage(UTF8ToString('Nenhuma diferença textual detectada.'));
     Exit;
   end;
 
@@ -650,7 +673,7 @@ begin
   if LFile = '' then
     Exit;
 
-  if MessageDlg('Deseja realmente DESCARTAR todas as alterações do arquivo:' + sLineBreak + LFile + '?',
+  if MessageDlg(UTF8ToString('Deseja realmente DESCARTAR todas as alterações do arquivo:') + sLineBreak + LFile + '?',
     mtConfirmation, [mbYes, mbNo], 0) = mrYes then
   begin
     FRunner.DiscardChanges(LFile, FProjectDir);

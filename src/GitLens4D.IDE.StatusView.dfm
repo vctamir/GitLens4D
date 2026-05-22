@@ -13,11 +13,23 @@ object GitStatusView: TGitStatusView
   OldCreateOrder = False
   PixelsPerInch = 96
   TextHeight = 13
+  object Splitter1: TSplitter
+    Left = 0
+    Top = 373
+    Width = 466
+    Height = 10
+    Cursor = crVSplit
+    Align = alBottom
+    Beveled = True
+    Color = 15000804
+    ParentColor = False
+    ExplicitTop = 380
+  end
   object lstFiles: TListView
     Left = 0
     Top = 66
     Width = 466
-    Height = 317
+    Height = 307
     Align = alClient
     Checkboxes = True
     Columns = <
@@ -39,6 +51,7 @@ object GitStatusView: TGitStatusView
     PopupMenu = pmStatus
     TabOrder = 0
     ViewStyle = vsReport
+    ExplicitHeight = 317
   end
   object pnlBranch: TPanel
     Left = 0
@@ -277,7 +290,7 @@ object GitStatusView: TGitStatusView
     Left = 184
     Top = 152
     Bitmap = {
-      494C0101070008005C0018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C010107000800700018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000600000003000000001002000000000000048
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000200000

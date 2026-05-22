@@ -60,15 +60,11 @@ function TAIService.NormalizeResponse(const AResponse: string): string;
 var
   LRes: string;
 begin
-  // Limpeza de segurança e normalização de quebras de linha (LF -> CRLF)
-  LRes := StringReplace(AResponse, '```', '', [rfReplaceAll]);
-  LRes := StringReplace(LRes, '`', '', [rfReplaceAll]);
-  
-  // Converte LF ou CR isolados para CRLF (padrão Windows/TMemo)
-  LRes := StringReplace(LRes, #13#10, #10, [rfReplaceAll]);
-  LRes := StringReplace(LRes, #13, #10, [rfReplaceAll]);
-  LRes := StringReplace(LRes, #10, sLineBreak, [rfReplaceAll]);
-  
+  LRes   := StringReplace(AResponse, '```', '', [rfReplaceAll]);
+  LRes   := StringReplace(LRes, '`', '', [rfReplaceAll]);
+  LRes   := StringReplace(LRes, #13#10, #10, [rfReplaceAll]);
+  LRes   := StringReplace(LRes, #13, #10, [rfReplaceAll]);
+  LRes   := StringReplace(LRes, #10, sLineBreak, [rfReplaceAll]);
   Result := LRes.Trim;
 end;
 
@@ -79,12 +75,14 @@ var
   LMaxTokens                           : Integer;
   LSystem, LUser                       : string;
   LResponse                            : string;
+  LSHist, LSChanges, LExtraTag         : string;
 begin
   Result := '';
   if not Assigned(FSettings) then
     Exit;
 
   FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
+  FSettings.LoadGeneralConfig(LSHist, LSChanges, LExtraTag);
 
   if LEndpoint.Trim = '' then
   begin
@@ -100,22 +98,31 @@ begin
     'REGRAS DE OURO:' + sLineBreak +
     '1. Responda APENAS o texto do commit e o resumo técnico.' + sLineBreak +
     '2. PROIBIDO qualquer introdução, explicação ou Markdown de bloco (```).' + sLineBreak +
-    '3. Substitua [tipo] por um dos seguintes: feat, fix, docs, refactor, style, test, perf, chore.'+
-    'Exemplo de como você deve responder:' +
-    '[FEAT]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Adicionado novo sistema de logs' + sLineBreak ;
+    '3. OBRIGATÓRIO Substitua [tipo] por EXATAMENTE um dos seguintes: [FEAT|FIX|DOCS|REFACTOR|STYLE|TEST|PERF|CHORE].';
+
+  if LExtraTag <> '' then
+    LSystem := LSystem + sLineBreak + '4. OBRIGATÓRIO: Inclua a tag ' + LExtraTag ;
+
+  LSystem := LSystem + sLineBreak + 'Exemplo de resposta:' + sLineBreak;
+  if LExtraTag <> '' then
+    LSystem := LSystem + LExtraTag + sLineBreak;
+
+  LSystem := LSystem + '[tipo]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit ';
 
   LUser := 'DADOS PARA GERAÇÃO:' + sLineBreak +
     '- Task Number: ' + ATaskNum + sLineBreak +
     '- Task Description: ' + ATaskDesc + sLineBreak +
     '- Diff: ' + ADiff + sLineBreak + sLineBreak +
-    'ESTRUTURA OBRIGATÓRIA DA RESPOSTA:' + sLineBreak +
-    '## [FEAT][#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
-    '### [VERSAO]' +AProjName +' v. '+ AProjVer + sLineBreak +
+    'ESTRUTURA OBRIGATÓRIA DA RESPOSTA:' + sLineBreak;
+  if LExtraTag <> '' then
+    LUser := LUser + LExtraTag + sLineBreak;
+  LUser := LUser + '## [tipo]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
+    '### [VERSAO] ' + AProjName + ' v. ' + AProjVer + sLineBreak +
     sLineBreak +
     '### Detalhamento por arquivo' + sLineBreak +
     '* **nome_arquivo.pas**: breve descrição em ' + LLang + sLineBreak +
     sLineBreak +
-    'Gere a resposta agora baseada nos DADOS PARA GERAÇÃO fornecidos:';
+    'Gere a resposta agora:';
 
   try
     if SameText(LType, 'Local') and LEndpoint.Contains('11434') then
@@ -126,7 +133,7 @@ begin
     Result := NormalizeResponse(LResponse);
   except
     on E: Exception do
-      Result := Format('Erro de Conexão: %s' + sLineBreak + 'URL: %s', [E.Message, LEndpoint]);
+      Result := Format('Erro de Conexão: %s', [E.Message]);
   end;
 end;
 
@@ -139,11 +146,12 @@ var
   LResponse                            : string;
 begin
   Result := '';
-  if not Assigned(FSettings) then Exit;
+  if not Assigned(FSettings) then
+    Exit;
   FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
 
   LSystem := 'Você é um Engenheiro de Software Senior especializado em Pull Requests.' + sLineBreak +
-    'IDIOMA OBRIGATÓRIO: ' + LLang + sLineBreak +
+    'IDIOMA: ' + LLang + sLineBreak +
     'OBJETIVO: Gerar uma descrição de PR profissional seguindo os padrões do GitHub.' + sLineBreak +
     'REGRAS:' + sLineBreak +
     '1. Use Markdown completo.' + sLineBreak +
@@ -170,7 +178,7 @@ begin
     'Gere a descrição do PR agora:';
 
   try
-    if SameText(LType, 'Local')  then
+    if SameText(LType, 'Local') and LEndpoint.Contains('11434') then
       LResponse := CallOllamaLegacy(LEndpoint, LModel, LSystem + sLineBreak + LUser, LTemp, LMaxTokens)
     else
       LResponse := CallChatAPI(LEndpoint, LKey, LModel, LSystem, LUser, LTemp, LMaxTokens);

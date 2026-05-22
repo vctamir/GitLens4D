@@ -1,4 +1,4 @@
-﻿unit GitLens4D.IDE.Menu;
+unit GitLens4D.IDE.Menu;
 
 { ============================================================================
   GitLens4D - Gerenciamento do Menu do IDE
@@ -6,9 +6,6 @@
 
   Responsabilidade única: criar, configurar e destruir o menu "QSGitLens4D"
   no IDE, notificando o wizard por callbacks (eventos) sem conhecer sua lógica.
-
-  O wizard injeta os callbacks no construtor (Dependency Injection via
-  parâmetros de método), eliminando o acoplamento direto.
   ============================================================================ }
 
 interface
@@ -23,26 +20,31 @@ type
 
   TGitLensMenu = class
   private
-    FMenuRoot  : TMenuItem;
-    FMenuEditor: TMenuItem;
-    FMenuDebug : TMenuItem;
-    FMenuStatus : TMenuItem;
+    FMenuRoot    : TMenuItem;
+    FMenuEditor  : TMenuItem;
+    FMenuDebug   : TMenuItem;
+    FMenuStatus  : TMenuItem;
+    FMenuHistory : TMenuItem;
+    FMenuSettings: TMenuItem;
 
-    FOnEditorToggle : TMenuToggleEvent;
-    FOnDebugToggle  : TMenuToggleEvent;
-    FOnHistoryAction: TMenuActionEvent;
-    FOnStatusAction : TMenuActionEvent;
+    FOnEditorToggle   : TMenuToggleEvent;
+    FOnDebugToggle    : TMenuToggleEvent;
+    FOnHistoryAction  : TMenuActionEvent;
+    FOnStatusAction   : TMenuActionEvent;
+    FOnSettingsAction : TMenuActionEvent;
 
     procedure MenuEditorClick(Sender: TObject);
     procedure MenuDebugClick(Sender: TObject);
     procedure MenuHistoryClick(Sender: TObject);
     procedure MenuStatusClick(Sender: TObject);
+    procedure MenuSettingsClick(Sender: TObject);
   public
     constructor Create(AEnabledEditor, AEnabledDebug: Boolean;
       AOnEditorToggle: TMenuToggleEvent;
       AOnDebugToggle: TMenuToggleEvent;
       AOnHistoryAction: TMenuActionEvent;
-      AOnStatusAction: TMenuActionEvent);
+      AOnStatusAction: TMenuActionEvent;
+      AOnSettingsAction: TMenuActionEvent);
     destructor Destroy; override;
 
     procedure SyncEditorState(AEnabled: Boolean);
@@ -60,17 +62,19 @@ constructor TGitLensMenu.Create(AEnabledEditor, AEnabledDebug: Boolean;
   AOnEditorToggle: TMenuToggleEvent;
   AOnDebugToggle: TMenuToggleEvent;
   AOnHistoryAction: TMenuActionEvent;
-  AOnStatusAction: TMenuActionEvent);
+  AOnStatusAction: TMenuActionEvent;
+  AOnSettingsAction: TMenuActionEvent);
 var
   NTAServices: INTAServices;
   Divisor    : TMenuItem;
 begin
   inherited Create;
 
-  FOnEditorToggle  := AOnEditorToggle;
-  FOnDebugToggle   := AOnDebugToggle;
-  FOnHistoryAction := AOnHistoryAction;
-  FOnStatusAction  := AOnStatusAction;
+  FOnEditorToggle   := AOnEditorToggle;
+  FOnDebugToggle    := AOnDebugToggle;
+  FOnHistoryAction  := AOnHistoryAction;
+  FOnStatusAction   := AOnStatusAction;
+  FOnSettingsAction := AOnSettingsAction;
 
   if not Supports(BorlandIDEServices, INTAServices, NTAServices) then
     Exit;
@@ -79,12 +83,12 @@ begin
   FMenuRoot.Caption := 'QSGitLens4D';
 
   FMenuEditor         := TMenuItem.Create(nil);
-  FMenuEditor.Caption := 'Ativo no Editor';
+  FMenuEditor.Caption := UTF8ToString('Ativo no Editor');
   FMenuEditor.Checked := AEnabledEditor;
   FMenuEditor.OnClick := MenuEditorClick;
 
   FMenuDebug         := TMenuItem.Create(nil);
-  FMenuDebug.Caption := 'Ativo no Debug';
+  FMenuDebug.Caption := UTF8ToString('Ativo no Debug');
   FMenuDebug.Checked := AEnabledDebug;
   FMenuDebug.OnClick := MenuDebugClick;
 
@@ -92,7 +96,7 @@ begin
   Divisor.Caption := '-';
 
   FMenuStatus         := TMenuItem.Create(nil);
-  FMenuStatus.Caption := 'Exibir Alterações do Git (Git Changes)';
+  FMenuStatus.Caption := UTF8ToString('Exibir Alterações do Git (Git Changes)');
   FMenuStatus.OnClick := MenuStatusClick;
 
   FMenuRoot.Add(FMenuEditor);
@@ -104,17 +108,26 @@ begin
   Divisor.Caption := '-';
   FMenuRoot.Add(Divisor);
 
-  FMenuStatus         := TMenuItem.Create(nil);
-  FMenuStatus.Caption := 'Explorar Histórico da Linha Atual (Ctrl+Shift+H)';
-  FMenuStatus.OnClick := MenuHistoryClick;
-  FMenuRoot.Add(FMenuStatus);
+  FMenuHistory         := TMenuItem.Create(nil);
+  FMenuHistory.Caption := UTF8ToString('Explorar Histórico da Linha Atual (Ctrl+Shift+H)');
+  FMenuHistory.OnClick := MenuHistoryClick;
+  FMenuRoot.Add(FMenuHistory);
+
+  Divisor         := TMenuItem.Create(nil);
+  Divisor.Caption := '-';
+  FMenuRoot.Add(Divisor);
+
+  FMenuSettings         := TMenuItem.Create(nil);
+  FMenuSettings.Caption := UTF8ToString('Configurações (Settings)...');
+  FMenuSettings.OnClick := MenuSettingsClick;
+  FMenuRoot.Add(FMenuSettings);
 
   NTAServices.AddActionMenu('viewsMenu', nil, FMenuRoot, True, True);
 end;
 
 destructor TGitLensMenu.Destroy;
 begin
-  FMenuRoot.Free; // libera todos os filhos (owned pelo parent)
+  FMenuRoot.Free;
   inherited Destroy;
 end;
 
@@ -148,6 +161,12 @@ procedure TGitLensMenu.MenuStatusClick(Sender: TObject);
 begin
   if Assigned(FOnStatusAction) then
     FOnStatusAction;
+end;
+
+procedure TGitLensMenu.MenuSettingsClick(Sender: TObject);
+begin
+  if Assigned(FOnSettingsAction) then
+    FOnSettingsAction;
 end;
 
 procedure TGitLensMenu.SyncEditorState(AEnabled: Boolean);

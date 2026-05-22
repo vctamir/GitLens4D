@@ -36,6 +36,7 @@ type
     procedure AddFile(const AFile, ABaseDir: string);
     procedure DiscardChanges(const AFile, ABaseDir: string);
     function GetRemoteUrl(const ABaseDir: string): string;
+    function GetAheadCount(const ABaseDir: string): Integer;
   end;
 
   // ── Contrato: Interpretar saída do "git blame -p" ────────────────────────
@@ -76,6 +77,16 @@ type
     function Parse(const ARawOutput: string): TGitFileStatusArray;
   end;
 
+  TGitProjectMetadata = record
+    ProjectName: string;
+    ProjectVersion: string;
+  end;
+
+  IGitProjectProvider = interface
+    ['{E9F8B7C6-D5E4-4321-A1B2-C3D4E5F67890}']
+    function GetMetadata: TGitProjectMetadata;
+  end;
+
   // ── Contrato: Provedor de Status do Repositório ──────────────────────────
   IGitStatusProvider = interface
     ['{87654321-DCBA-4321-DCBA-0987654321BA}']
@@ -91,8 +102,12 @@ type
     procedure SaveTaskInfo(const ATaskNum, ATaskDesc: string);
     procedure LoadCommitDraft(out ADraft: string);
     procedure SaveCommitDraft(const ADraft: string);
+    procedure LoadSelectedFiles(out AFiles: string);
+    procedure SaveSelectedFiles(const AFiles: string);
     procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang: string; out ATemp: Double; out AMaxTokens: Integer);
     procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang: string; ATemp: Double; AMaxTokens: Integer);
+    procedure LoadGeneralConfig(out AShortcutHist, AShortcutChanges, ACommitTag: string);
+    procedure SaveGeneralConfig(const AShortcutHist, AShortcutChanges, ACommitTag: string);
   end;
 
   // ── Contrato: Serviço de IA para mensagens de commit ─────────────────────

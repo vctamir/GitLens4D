@@ -27,8 +27,12 @@ type
     procedure SaveTaskInfo(const ATaskNum, ATaskDesc: string);
     procedure LoadCommitDraft(out ADraft: string);
     procedure SaveCommitDraft(const ADraft: string);
+    procedure LoadSelectedFiles(out AFiles: string);
+    procedure SaveSelectedFiles(const AFiles: string);
     procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang: string; out ATemp: Double; out AMaxTokens: Integer);
     procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang: string; ATemp: Double; AMaxTokens: Integer);
+    procedure LoadGeneralConfig(out AShortcutHist, AShortcutChanges, ACommitTag: string);
+    procedure SaveGeneralConfig(const AShortcutHist, AShortcutChanges, ACommitTag: string);
   end;
 
 implementation
@@ -143,6 +147,38 @@ begin
   end;
 end;
 
+procedure TGitLensSettings.LoadSelectedFiles(out AFiles: string);
+var
+  Reg: TRegistry;
+begin
+  AFiles := '';
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey(REG_KEY, False) then
+    begin
+      if Reg.ValueExists('SelectedFiles') then
+        AFiles := Reg.ReadString('SelectedFiles');
+    end;
+  finally
+    Reg.Free;
+  end;
+end;
+
+procedure TGitLensSettings.SaveSelectedFiles(const AFiles: string);
+var
+  Reg: TRegistry;
+begin
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey(REG_KEY, True) then
+      Reg.WriteString('SelectedFiles', AFiles);
+  finally
+    Reg.Free;
+  end;
+end;
+
 procedure TGitLensSettings.LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang: string; out ATemp: Double; out AMaxTokens: Integer);
 var
   Reg: TRegistry;
@@ -189,6 +225,46 @@ begin
       Reg.WriteString('AILang', ALang);
       Reg.WriteFloat('AITemp', ATemp);
       Reg.WriteInteger('AIMaxTokens', AMaxTokens);
+    end;
+  finally
+    Reg.Free;
+  end;
+end;
+
+procedure TGitLensSettings.LoadGeneralConfig(out AShortcutHist, AShortcutChanges, ACommitTag: string);
+var
+  Reg: TRegistry;
+begin
+  AShortcutHist    := 'Ctrl+Shift+H';
+  AShortcutChanges := 'Ctrl+Alt+G';
+  ACommitTag       := '';
+
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey(REG_KEY, False) then
+    begin
+      if Reg.ValueExists('ShortcutHist') then AShortcutHist := Reg.ReadString('ShortcutHist');
+      if Reg.ValueExists('ShortcutChanges') then AShortcutChanges := Reg.ReadString('ShortcutChanges');
+      if Reg.ValueExists('CommitExtraTag') then ACommitTag := Reg.ReadString('CommitExtraTag');
+    end;
+  finally
+    Reg.Free;
+  end;
+end;
+
+procedure TGitLensSettings.SaveGeneralConfig(const AShortcutHist, AShortcutChanges, ACommitTag: string);
+var
+  Reg: TRegistry;
+begin
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey(REG_KEY, True) then
+    begin
+      Reg.WriteString('ShortcutHist', AShortcutHist);
+      Reg.WriteString('ShortcutChanges', AShortcutChanges);
+      Reg.WriteString('CommitExtraTag', ACommitTag);
     end;
   finally
     Reg.Free;

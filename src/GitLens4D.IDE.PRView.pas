@@ -3,10 +3,23 @@
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  GitLens4D.Interfaces, ToolsAPI, Vcl.Clipbrd, Winapi.ShellAPI,
-  System.ImageList, Vcl.ImgList;
+  Winapi.Windows,
+  Winapi.Messages,
+  System.SysUtils,
+  System.Variants,
+  System.Classes,
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Dialogs,
+  Vcl.StdCtrls,
+  Vcl.ExtCtrls,
+  GitLens4D.Interfaces,
+  ToolsAPI,
+  Vcl.Clipbrd,
+  Winapi.ShellAPI,
+  System.ImageList,
+  Vcl.ImgList;
 
 type
   TGitPRView = class(TForm)
@@ -17,23 +30,21 @@ type
     btnClose: TButton;
     pnlTop: TPanel;
     lblTitle: TLabel;
-    ImageList1: TImageList;
     procedure btnCloseClick(Sender: TObject);
     procedure btnSuggestClick(Sender: TObject);
     procedure btnCopyOpenClick(Sender: TObject);
   private
-    FRunner: IGitRunner;
-    FAIService: IAIService;
-    FSettings: ISettingsRepository;
+    FRunner    : IGitRunner;
+    FAIService : IAIService;
+    FSettings  : ISettingsRepository;
     FProjectDir: string;
-    FTaskNum: string;
-    FTaskDesc: string;
-    FProjName: string;
-    FProjVer: string;
+    FTaskNum   : string;
+    FTaskDesc  : string;
+    FProjName  : string;
+    FProjVer   : string;
 
     procedure ApplyTheme;
     procedure UpdatePRBody(const AText: string);
-    procedure DoGeneratePR(const ADiff: string);
   protected
     procedure DoShow; override;
   public
@@ -46,7 +57,12 @@ procedure ShowPRWindow(ARunner: IGitRunner; AAIService: IAIService;
 
 implementation
 
+uses
+  System.StrUtils,
+  GitLens4D.Git.ProjectProvider;
+
 {$R *.dfm}
+
 
 procedure ShowPRWindow(ARunner: IGitRunner; AAIService: IAIService;
   ASettings: ISettingsRepository; const AProjectDir, ATaskNum, ATaskDesc, AProjName, AProjVer: string);
@@ -65,15 +81,15 @@ constructor TGitPRView.Create(AOwner: TComponent; ARunner: IGitRunner; AAIServic
   ASettings: ISettingsRepository; const AProjectDir, ATaskNum, ATaskDesc, AProjName, AProjVer: string);
 begin
   inherited Create(AOwner);
-  FRunner := ARunner;
-  FAIService := AAIService;
-  FSettings := ASettings;
+  FRunner     := ARunner;
+  FAIService  := AAIService;
+  FSettings   := ASettings;
   FProjectDir := AProjectDir;
-  FTaskNum := ATaskNum;
-  FTaskDesc := ATaskDesc;
-  FProjName := AProjName;
-  FProjVer := AProjVer;
-  
+  FTaskNum    := ATaskNum;
+  FTaskDesc   := ATaskDesc;
+  FProjName   := AProjName;
+  FProjVer    := AProjVer;
+
   Self.PopupMode := pmAuto;
 end;
 
@@ -104,13 +120,19 @@ end;
 
 procedure TGitPRView.btnSuggestClick(Sender: TObject);
 var
-  LDiff: string;
+  LDiff              : string;
+  LView              : TGitPRView;
+  LSvc               : IAIService;
+  LNum, LDesc        : string;
+  LSuggestion        : string;
+  LMetadata          : TGitProjectMetadata;
 begin
-  if not Assigned(FAIService) then Exit;
+  if not Assigned(FAIService) then
+    Exit;
 
   if not FAIService.IsConfigured then
   begin
-    ShowMessage('IA não configurada! Por favor, configure o endpoint e o modelo antes de solicitar a elaboração do PR.');
+    ShowMessage(UTF8ToString('IA não configurada! Por favor, configure o endpoint e o modelo antes de solicitar a elaboração do PR.'));
     Exit;
   end;
 
@@ -121,37 +143,28 @@ begin
   if LDiff.Trim = '' then
     LDiff := FRunner.Execute('git show --stat HEAD', FProjectDir);
 
-  DoGeneratePR(LDiff);
-end;
+  LMetadata := TGitProjectProvider.Create.GetMetadata;
 
-procedure TGitPRView.DoGeneratePR(const ADiff: string);
-var
-  LView: TGitPRView;
-begin
   LView := Self;
+  LSvc  := FAIService;
+  LNum  := FTaskNum;
+  LDesc := FTaskDesc;
+
   TThread.CreateAnonymousThread(
     procedure
-    var
-      LSuggestion: string;
-      LNum, LDesc, LName, LVer, LDiffVal: string;
-      LSvc: IAIService;
     begin
-      LSvc := LView.FAIService;
-      LNum := LView.FTaskNum;
-      LDesc := LView.FTaskDesc;
-      LName := LView.FProjName;
-      LVer := LView.FProjVer;
-      LDiffVal := ADiff;
-
       try
-        LSuggestion := LSvc.GeneratePRDescription(LNum, LDesc, LDiffVal, LName, LVer);
-        
+        LSuggestion := LSvc.GeneratePRDescription(LNum, LDesc, LDiff, LMetadata.ProjectName, LMetadata.ProjectVersion);
+
         TThread.Synchronize(nil,
           procedure
           begin
-            LView.UpdatePRBody(LSuggestion);
-            LView.btnSuggest.Enabled := True;
-            LView.btnSuggest.Caption := 'Suggest AI PR';
+            if Assigned(LView) then
+            begin
+              LView.UpdatePRBody(LSuggestion);
+              LView.btnSuggest.Enabled := True;
+              LView.btnSuggest.Caption := 'Suggest AI PR';
+            end;
           end);
       except
         on E: Exception do
@@ -160,9 +173,12 @@ begin
           TThread.Synchronize(nil,
             procedure
             begin
-              ShowMessage('Erro: ' + LSuggestion);
-              LView.btnSuggest.Enabled := True;
-              LView.btnSuggest.Caption := 'Suggest AI PR';
+              if Assigned(LView) then
+              begin
+                ShowMessage(UTF8ToString('Erro: ') + LSuggestion);
+                LView.btnSuggest.Enabled := True;
+                LView.btnSuggest.Caption := 'Suggest AI PR';
+              end;
             end);
         end;
       end;
@@ -173,18 +189,18 @@ procedure TGitPRView.btnCopyOpenClick(Sender: TObject);
 var
   LUrl, LBranch: string;
 begin
-  if Trim (memPRBody.Text)= '' then
+  if Trim(memPRBody.Text) = '' then
   begin
-    ShowMessage('O corpo do PR está vazio.');
+    ShowMessage(UTF8ToString('O corpo do PR está vazio.'));
     Exit;
   end;
 
   Clipboard.AsText := memPRBody.Text;
-  
+
   LUrl := FRunner.GetRemoteUrl(FProjectDir);
   if LUrl = '' then
   begin
-    ShowMessage('Texto copiado! Mas não foi possível localizar a URL remota para abrir o navegador.');
+    ShowMessage(UTF8ToString('Texto copiado! Mas não foi possível localizar a URL remota para abrir o navegador.'));
     Exit;
   end;
 
@@ -193,15 +209,15 @@ begin
     LUrl := StringReplace(LUrl, ':', '/', [rfReplaceAll]);
     LUrl := StringReplace(LUrl, 'git@', 'https://', [rfReplaceAll]);
   end;
-  
+
   if LUrl.EndsWith('.git') then
     LUrl := Copy(LUrl, 1, Length(LUrl) - 4);
 
   LBranch := FRunner.GetCurrentBranch(FProjectDir);
-  LUrl := LUrl.Trim(['/']) + '/compare/' + LBranch + '?expand=1';
+  LUrl    := LUrl.Trim(['/']) + '/compare/' + LBranch + '?expand=1';
 
   ShellExecute(0, 'open', PChar(LUrl), nil, nil, SW_SHOWNORMAL);
-  ShowMessage('Descrição copiada e navegador aberto!');
+  ShowMessage(UTF8ToString('Descrição copiada e navegador aberto!'));
   Close;
 end;
 

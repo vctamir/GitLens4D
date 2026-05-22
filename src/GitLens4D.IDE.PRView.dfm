@@ -75,8 +75,6 @@ object GitPRView: TGitPRView
     ParentFont = False
     ScrollBars = ssVertical
     TabOrder = 1
-    ExplicitWidth = 594
-    ExplicitHeight = 408
   end
   object pnlTop: TPanel
     Left = 0
@@ -86,7 +84,6 @@ object GitPRView: TGitPRView
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 2
-    ExplicitWidth = 600
     object lblTitle: TLabel
       Left = 10
       Top = 13
@@ -108,7 +105,7 @@ object GitPRView: TGitPRView
     Left = 184
     Top = 152
     Bitmap = {
-      494C0101070008005C0018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C0101070008006C0018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000600000003000000001002000000000000048
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000200000

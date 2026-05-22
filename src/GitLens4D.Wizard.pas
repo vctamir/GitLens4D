@@ -5,14 +5,7 @@ unit GitLens4D.Wizard;
   Princípio: Open/Closed + Dependency Inversion (DIP)
 
   Este é o único arquivo que conhece TODAS as abstrações. Ele orquestra
-  o fluxo sem implementar nenhuma regra de negócio diretamente:
-  - Instancia as implementações concretas e as injeta nas interfaces.
-  - Conecta os callbacks entre os componentes visuais e os serviços Git.
-  - Responde aos eventos do IDE (menu, teclado, timer).
-
-  Para trocar qualquer comportamento (ex: outro parser, outro storage),
-   basta criar uma nova classe que implemente a interface correspondente
-  e substituir a instância no construtor, sem tocar neste arquivo.
+  o fluxo sem implementar nenhuma regra de negócio diretamente.
   ============================================================================ }
 
 interface
@@ -51,6 +44,7 @@ type
     procedure OnDebugToggle(ANewState: Boolean);
     procedure OnHistoryAction;
     procedure OnStatusAction;
+    procedure OnSettingsAction;
     procedure OnCursorChanged(const AFile: string; ALine: Integer);
     function OnIsActive: Boolean;
     procedure OnKeyShortcut;
@@ -59,6 +53,7 @@ type
     function IsDebugging: Boolean;
     function GetCurrentCursorInfo(out AFile: string; out ALine: Integer): Boolean;
     procedure ShowGitBlame(const AFile: string; ALine: Integer);
+    procedure ReloadShortcuts;
   public
     constructor Create;
     destructor Destroy; override;
@@ -92,13 +87,13 @@ uses
   GitLens4D.IDE.Messenger,
   GitLens4D.IDE.KeyBinding,
   GitLens4D.IDE.StatusDock,
-  GitLens4D.IDE.HistoryView;
+  GitLens4D.IDE.HistoryView,
+  GitLens4D.IDE.SettingsView;
 
 { TGitLens4D }
 
 constructor TGitLens4D.Create;
 var
-  KeySvc      : IOTAKeyboardServices;
   PathResolver: IGitPathResolver;
 begin
   inherited Create;
@@ -127,13 +122,12 @@ begin
     OnEditorToggle,
     OnDebugToggle,
     OnHistoryAction,
-    OnStatusAction);
+    OnStatusAction,
+    OnSettingsAction);
 
   FTracker := TGitLensCursorTracker.Create(OnCursorChanged, OnIsActive);
 
-  if Supports(BorlandIDEServices, IOTAKeyboardServices, KeySvc) then
-    FKeyBindIdx := KeySvc.AddKeyboardBinding(
-      TGitLensKeyboardBinding.Create(OnHistoryAction, OnStatusAction));
+  ReloadShortcuts;
 end;
 
 destructor TGitLens4D.Destroy;
@@ -148,6 +142,25 @@ begin
       KeySvc.RemoveKeyboardBinding(FKeyBindIdx);
 
   inherited Destroy;
+end;
+
+procedure TGitLens4D.ReloadShortcuts;
+var
+  KeySvc: IOTAKeyboardServices;
+  LHist, LChanges, LTag: string;
+begin
+  if Supports(BorlandIDEServices, IOTAKeyboardServices, KeySvc) then
+  begin
+    if FKeyBindIdx > 0 then
+    begin
+      KeySvc.RemoveKeyboardBinding(FKeyBindIdx);
+      FKeyBindIdx := -1;
+    end;
+
+    FSettings.LoadGeneralConfig(LHist, LChanges, LTag);
+    FKeyBindIdx := KeySvc.AddKeyboardBinding(
+      TGitLensKeyboardBinding.Create(OnHistoryAction, OnStatusAction, LHist, LChanges));
+  end;
 end;
 
 // ── IOTAWizard ────────────────────────────────────────────────────────────
@@ -169,7 +182,6 @@ end;
 
 procedure TGitLens4D.Execute;
 begin
-  // Ponto de entrada reservado pela interface; funcionalidade via menu/atalho.
 end;
 
 // ── Helpers internos ──────────────────────────────────────────────────────
@@ -259,6 +271,12 @@ begin
   ShowStatusWindow;
 end;
 
+procedure TGitLens4D.OnSettingsAction;
+begin
+  ShowGeneralSettings(FSettings);
+  ReloadShortcuts;
+end;
+
 procedure TGitShortcutSyncProc(const AMessenger: IIDEMessenger; const AMsg: string);
 begin
   AMessenger.ShowMessage(AMsg);
@@ -269,7 +287,6 @@ var
   AFile: string;
   ALine: Integer;
 begin
-  // Sempre consulta a posição atual fresca (atalho = intenção explícita)
   if GetCurrentCursorInfo(AFile, ALine) then
     ShowGitHistory(AFile, ALine);
 end;
@@ -328,7 +345,6 @@ begin
   Runner    := FRunner;
   Parser    := FHistParser;
   
-  // Expandimos para um bloco de 5 linhas (±2 ao redor da atual) para dar contexto
   LStart := ALine - 2;
   if LStart < 1 then LStart := 1;
   LEnd := ALine + 2;
@@ -358,12 +374,10 @@ begin
           if Length(LHistory) > 0 then
             ShowHistoryWindow(LFile, LLine, LHistory)
           else
-            ShowMessage('Nenhum histórico encontrado para esta linha.');
+            ShowMessage(UTF8ToString('Nenhum histórico encontrado para esta linha.'));
         end);
     end).Start;
 end;
-
-// ── Registro do Expert no IDE ────────────────────────────────────────────
 
 procedure Register;
 begin

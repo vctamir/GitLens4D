@@ -31,6 +31,7 @@ type
     procedure AddFile(const AFile, ABaseDir: string);
     procedure DiscardChanges(const AFile, ABaseDir: string);
     function GetRemoteUrl(const ABaseDir: string): string;
+    function GetAheadCount(const ABaseDir: string): Integer;
   end;
 
 implementation
@@ -140,6 +141,22 @@ begin
   PathSvc := TGitPathResolver.Create;
   Command := Format('"%s" config --get remote.origin.url', [PathSvc.Resolve]);
   Result  := Execute(Command, ABaseDir).Trim;
+end;
+
+function TGitRunner.GetAheadCount(const ABaseDir: string): Integer;
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+  LOutput: string;
+begin
+  Result := 0;
+  PathSvc := TGitPathResolver.Create;
+  // Conta commits que estão no HEAD mas não estão no upstream (@{u})
+  Command := Format('"%s" rev-list --count @{u}..HEAD', [PathSvc.Resolve]);
+  LOutput := Execute(Command, ABaseDir).Trim;
+  
+  if LOutput <> '' then
+    Result := StrToIntDef(LOutput, 0);
 end;
 
 function TGitRunner.GetRepoRoot(const ABaseDir: string): string;
