@@ -45,10 +45,18 @@ type
   end;
 
   // ── Contrato: Interpretar saída do "git log -L" ──────────────────────────
-  // Retorna TStringList (caller é responsável por liberá-la)
+  TGitHistoryEntry = record
+    Hash: string;
+    Author: string;
+    Date: string;
+    Message: string;
+    Patch: string; // Conteúdo do código alterado
+  end;
+  TGitHistoryArray = array of TGitHistoryEntry;
+
   IHistoryParser = interface
     ['{D4E5F6A7-B8C9-4012-DE34-567890ABCDEF}']
-    function Parse(const ARawOutput: string; ALine: Integer): TStringList;
+    function Parse(const ARawOutput: string; ALine: Integer): TGitHistoryArray;
   end;
 
   // ── Estruturas para Status de Arquivos ──────────────────────────────────

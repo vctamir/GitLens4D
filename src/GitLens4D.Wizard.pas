@@ -336,26 +336,22 @@ begin
     procedure
     var
       Raw: string;
-      Linhas: TStringList;
+      LHistory: TGitHistoryArray;
       LFile: string;
       LLine: Integer;
     begin
       Raw := Runner.Execute(Comando, DirBase);
-      Linhas := Parser.Parse(Trim(Raw), ALine);
+      LHistory := Parser.Parse(Trim(Raw), ALine);
       LFile := AFile;
       LLine := ALine;
 
       TThread.Synchronize(nil,
         procedure
         begin
-          try
-            if Linhas.Count > 0 then
-              ShowHistoryWindow(LFile, LLine, Linhas)
-            else
-              ShowMessage('Nenhum histórico encontrado para esta linha.');
-          finally
-            Linhas.Free;
-          end;
+          if Length(LHistory) > 0 then
+            ShowHistoryWindow(LFile, LLine, LHistory)
+          else
+            ShowMessage('Nenhum histórico encontrado para esta linha.');
         end);
     end).Start;
 end;
