@@ -63,6 +63,11 @@
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
         <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
         <SanitizedProjectName>GitLens4D</SanitizedProjectName>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Release>1</VerInfo_Release>
+        <VerInfo_Build>1</VerInfo_Build>
+        <VerInfo_Locale>1046</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.1.1;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Linux64)'!=''">
         <DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
@@ -70,13 +75,10 @@
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <BT_BuildType>Debug</BT_BuildType>
-        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
-        <VerInfo_Locale>1033</VerInfo_Locale>
-        <DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
+        <DCC_UsePackage>rtl;vcl;vclimg;vclie;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
-        <DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
+        <DCC_UsePackage>rtl;vcl;vclimg;vclie;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -90,8 +92,6 @@
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
         <DCC_DcpOutput>.\dcp</DCC_DcpOutput>
         <DCC_BplOutput>.\bin</DCC_BplOutput>
-        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -102,8 +102,6 @@
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <DCC_DcpOutput>.\dcp</DCC_DcpOutput>
         <DCC_BplOutput>.\bin</DCC_BplOutput>
-        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -111,6 +109,10 @@
         </DelphiCompile>
         <DCCReference Include="designide.dcp"/>
         <DCCReference Include="rtl.dcp"/>
+        <DCCReference Include="vcl.dcp"/>
+        <DCCReference Include="vclimg.dcp"/>
+        <DCCReference Include="vclie.dcp"/>
+        <DCCReference Include="src\GitLens4D.Interfaces.pas"/>
         <DCCReference Include="src\GitLens4D.Git.AIService.pas"/>
         <DCCReference Include="src\GitLens4D.Git.BlameParser.pas"/>
         <DCCReference Include="src\GitLens4D.Git.HistoryParser.pas"/>
@@ -127,13 +129,15 @@
             <Form>GitStatusView</Form>
             <FormType>dfm</FormType>
         </DCCReference>
+        <DCCReference Include="src\GitLens4D.IDE.PRView.pas">
+            <Form>GitPRView</Form>
+        </DCCReference>
         <DCCReference Include="src\GitLens4D.IDE.AIConfigView.pas">
             <Form>GitAIConfigView</Form>
         </DCCReference>
         <DCCReference Include="src\GitLens4D.IDE.DiffView.pas">
             <Form>GitDiffView</Form>
         </DCCReference>
-        <DCCReference Include="src\GitLens4D.Interfaces.pas"/>
         <DCCReference Include="src\GitLens4D.Settings.pas"/>
         <DCCReference Include="src\GitLens4D.Wizard.pas"/>
         <BuildConfiguration Include="Release">
@@ -214,6 +218,7 @@
                     <Excluded_Packages Name="E:\Projetos\Utilitarios\QualityComponentes\_Bpl\d25\JvXPCtrls250.bpl">JVCL XP Controls Runtime Package</Excluded_Packages>
                     <Excluded_Packages Name="E:\Projetos\Utilitarios\QualityComponentes\_Bpl\d25\fqb250.bpl">FastQueryBuilder 1.03</Excluded_Packages>
                     <Excluded_Packages Name="E:\Projetos\Utilitarios\QualityComponentes\_Bpl\d25\frxIntIOBase25.bpl">(untitled)</Excluded_Packages>
+                    <Excluded_Packages Name="E:\Projetos\Utilitarios\QualityComponentes\Quality\QsGitLensExpert\bin\GitLensExpert.bpl">File E:\Projetos\Utilitarios\QualityComponentes\Quality\QsGitLensExpert\bin\GitLensExpert.bpl not found</Excluded_Packages>
                     <Excluded_Packages Name="E:\Projetos\Utilitarios\QualityComponentes\_BPL\D25\WebView4Delphi.bpl">File E:\Projetos\Utilitarios\QualityComponentes\_BPL\D25\WebView4Delphi.bpl not found</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dcloffice2k250.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclofficexp250.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>

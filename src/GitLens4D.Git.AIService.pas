@@ -1,4 +1,4 @@
-unit GitLens4D.Git.AIService;
+﻿unit GitLens4D.Git.AIService;
 
 { ============================================================================
   GitLens4D - Serviço de Integração com IA
@@ -143,7 +143,7 @@ begin
   FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
 
   LSystem := 'Você é um Engenheiro de Software Senior especializado em Pull Requests.' + sLineBreak +
-    'IDIOMA: ' + LLang + sLineBreak +
+    'IDIOMA OBRIGATÓRIO: ' + LLang + sLineBreak +
     'OBJETIVO: Gerar uma descrição de PR profissional seguindo os padrões do GitHub.' + sLineBreak +
     'REGRAS:' + sLineBreak +
     '1. Use Markdown completo.' + sLineBreak +
@@ -170,7 +170,7 @@ begin
     'Gere a descrição do PR agora:';
 
   try
-    if SameText(LType, 'Local') and LEndpoint.Contains('11434') then
+    if SameText(LType, 'Local')  then
       LResponse := CallOllamaLegacy(LEndpoint, LModel, LSystem + sLineBreak + LUser, LTemp, LMaxTokens)
     else
       LResponse := CallChatAPI(LEndpoint, LKey, LModel, LSystem, LUser, LTemp, LMaxTokens);

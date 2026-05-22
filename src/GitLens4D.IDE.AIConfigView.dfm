@@ -26,7 +26,7 @@ object GitAIConfigView: TGitAIConfigView
     object lblType: TLabel
       Left = 16
       Top = 16
-      Width = 43
+      Width = 42
       Height = 13
       Caption = 'AI Type:'
     end
@@ -61,7 +61,7 @@ object GitAIConfigView: TGitAIConfigView
     object lblMaxTokens: TLabel
       Left = 16
       Top = 206
-      Width = 62
+      Width = 61
       Height = 13
       Caption = 'Max Tokens:'
     end
@@ -78,12 +78,10 @@ object GitAIConfigView: TGitAIConfigView
       Width = 245
       Height = 21
       Style = csDropDownList
-      ItemIndex = 0
       TabOrder = 0
-      Text = 'Local'
       Items.Strings = (
         'Local'
-        'Remote')
+        'openAI')
     end
     object edtEndpoint: TEdit
       Left = 85

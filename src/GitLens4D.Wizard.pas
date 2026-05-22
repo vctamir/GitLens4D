@@ -80,6 +80,7 @@ implementation
 uses
   System.Classes,
   System.SysUtils,
+  Vcl.Dialogs,
   GitLens4D.Git.PathResolver,
   GitLens4D.Git.Runner,
   GitLens4D.Git.BlameParser,
@@ -90,7 +91,8 @@ uses
   GitLens4D.Settings,
   GitLens4D.IDE.Messenger,
   GitLens4D.IDE.KeyBinding,
-  GitLens4D.IDE.StatusDock;
+  GitLens4D.IDE.StatusDock,
+  GitLens4D.IDE.HistoryView;
 
 { TGitLens4D }
 
@@ -317,7 +319,6 @@ var
   DirBase  : string;
   Runner   : IGitRunner;
   Parser   : IHistoryParser;
-  Messenger: IIDEMessenger;
 begin
   if not FileExists(AFile) then
     Exit;
@@ -325,7 +326,6 @@ begin
   DirBase   := ExtractFilePath(AFile);
   Runner    := FRunner;
   Parser    := FHistParser;
-  Messenger := FMessenger;
   Comando   := Format(
     '"%s" log -n 10 -L %d,%d:"%s" ' +
     '--pretty=format:"#LOG#|%%h|%%an|%%ad|%%s" ' +
@@ -337,15 +337,22 @@ begin
     var
       Raw: string;
       Linhas: TStringList;
+      LFile: string;
+      LLine: Integer;
     begin
       Raw := Runner.Execute(Comando, DirBase);
       Linhas := Parser.Parse(Trim(Raw), ALine);
+      LFile := AFile;
+      LLine := ALine;
 
       TThread.Synchronize(nil,
         procedure
         begin
           try
-            Messenger.ShowMessages(Linhas);
+            if Linhas.Count > 0 then
+              ShowHistoryWindow(LFile, LLine, Linhas)
+            else
+              ShowMessage('Nenhum histórico encontrado para esta linha.');
           finally
             Linhas.Free;
           end;

@@ -5,7 +5,8 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  GitLens4D.Interfaces, ToolsAPI, Vcl.Clipbrd, Winapi.ShellAPI;
+  GitLens4D.Interfaces, ToolsAPI, Vcl.Clipbrd, Winapi.ShellAPI,
+  System.ImageList, Vcl.ImgList;
 
 type
   TGitPRView = class(TForm)
@@ -16,6 +17,7 @@ type
     btnClose: TButton;
     pnlTop: TPanel;
     lblTitle: TLabel;
+    ImageList1: TImageList;
     procedure btnCloseClick(Sender: TObject);
     procedure btnSuggestClick(Sender: TObject);
     procedure btnCopyOpenClick(Sender: TObject);
@@ -149,7 +151,7 @@ begin
           begin
             LView.UpdatePRBody(LSuggestion);
             LView.btnSuggest.Enabled := True;
-            LView.btnSuggest.Caption := '🪄 Suggest AI PR';
+            LView.btnSuggest.Caption := 'Suggest AI PR';
           end);
       except
         on E: Exception do
@@ -160,7 +162,7 @@ begin
             begin
               ShowMessage('Erro: ' + LSuggestion);
               LView.btnSuggest.Enabled := True;
-              LView.btnSuggest.Caption := '🪄 Suggest AI PR';
+              LView.btnSuggest.Caption := 'Suggest AI PR';
             end);
         end;
       end;
