@@ -319,6 +319,7 @@ var
   DirBase  : string;
   Runner   : IGitRunner;
   Parser   : IHistoryParser;
+  LStart, LEnd: Integer;
 begin
   if not FileExists(AFile) then
     Exit;
@@ -326,11 +327,17 @@ begin
   DirBase   := ExtractFilePath(AFile);
   Runner    := FRunner;
   Parser    := FHistParser;
+  
+  // Expandimos para um bloco de 5 linhas (±2 ao redor da atual) para dar contexto
+  LStart := ALine - 2;
+  if LStart < 1 then LStart := 1;
+  LEnd := ALine + 2;
+
   Comando   := Format(
     '"%s" log -n 10 -L %d,%d:"%s" ' +
     '--pretty=format:"#LOG#|%%h|%%an|%%ad|%%s" ' +
     '--date=format:"%%d/%%m/%%Y %%H:%%M:%%S"',
-    [FGitPath, ALine, ALine, AFile]);
+    [FGitPath, LStart, LEnd, AFile]);
 
   TThread.CreateAnonymousThread(
     procedure
