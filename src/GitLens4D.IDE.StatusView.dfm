@@ -3,7 +3,7 @@ object GitStatusView: TGitStatusView
   Top = 0
   Caption = 'Git Changes'
   ClientHeight = 650
-  ClientWidth = 466
+  ClientWidth = 530
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -16,7 +16,7 @@ object GitStatusView: TGitStatusView
   object Splitter1: TSplitter
     Left = 0
     Top = 373
-    Width = 466
+    Width = 530
     Height = 10
     Cursor = crVSplit
     Align = alBottom
@@ -24,11 +24,12 @@ object GitStatusView: TGitStatusView
     Color = 15000804
     ParentColor = False
     ExplicitTop = 380
+    ExplicitWidth = 466
   end
   object lstFiles: TListView
     Left = 0
     Top = 66
-    Width = 466
+    Width = 530
     Height = 307
     Align = alClient
     Checkboxes = True
@@ -51,18 +52,19 @@ object GitStatusView: TGitStatusView
     PopupMenu = pmStatus
     TabOrder = 0
     ViewStyle = vsReport
-    ExplicitHeight = 317
+    ExplicitWidth = 466
   end
   object pnlBranch: TPanel
     Left = 0
     Top = 0
-    Width = 466
+    Width = 530
     Height = 49
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 2
+    ExplicitWidth = 466
     DesignSize = (
-      466
+      530
       49)
     object lblBranch: TLabel
       Left = 7
@@ -75,7 +77,7 @@ object GitStatusView: TGitStatusView
       AlignWithMargins = True
       Left = 5
       Top = 22
-      Width = 192
+      Width = 214
       Height = 21
       Style = csDropDownList
       Anchors = [akLeft, akRight, akBottom]
@@ -84,9 +86,9 @@ object GitStatusView: TGitStatusView
     end
     object btnNewBranch: TButton
       AlignWithMargins = True
-      Left = 200
+      Left = 225
       Top = 3
-      Width = 65
+      Width = 71
       Height = 43
       Align = alRight
       Caption = 'Branch'
@@ -94,12 +96,13 @@ object GitStatusView: TGitStatusView
       Images = ImageList1
       TabOrder = 1
       OnClick = btnNewBranchClick
+      ExplicitLeft = 231
     end
     object btnPull: TButton
       AlignWithMargins = True
-      Left = 271
+      Left = 302
       Top = 3
-      Width = 60
+      Width = 71
       Height = 43
       Align = alRight
       Caption = 'Pull'
@@ -107,12 +110,13 @@ object GitStatusView: TGitStatusView
       Images = ImageList1
       TabOrder = 3
       OnClick = btnPullClick
+      ExplicitLeft = 305
     end
     object btnPush: TButton
       AlignWithMargins = True
-      Left = 337
+      Left = 379
       Top = 3
-      Width = 60
+      Width = 71
       Height = 43
       Align = alRight
       Caption = 'Push'
@@ -120,12 +124,13 @@ object GitStatusView: TGitStatusView
       Images = ImageList1
       TabOrder = 2
       OnClick = btnPushClick
+      ExplicitLeft = 381
     end
     object btnPR: TButton
       AlignWithMargins = True
-      Left = 403
+      Left = 456
       Top = 3
-      Width = 60
+      Width = 71
       Height = 43
       Align = alRight
       Caption = 'PR'
@@ -133,39 +138,43 @@ object GitStatusView: TGitStatusView
       Images = ImageList1
       TabOrder = 4
       OnClick = btnPRClick
+      ExplicitLeft = 457
     end
   end
   object pnlCommit: TPanel
     Left = 0
     Top = 383
-    Width = 466
+    Width = 530
     Height = 267
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 1
+    ExplicitWidth = 466
     DesignSize = (
-      466
+      530
       267)
     object memCommitMsg: TMemo
       AlignWithMargins = True
       Left = 3
       Top = 56
-      Width = 460
+      Width = 524
       Height = 164
       Align = alClient
       ScrollBars = ssVertical
       TabOrder = 0
+      ExplicitWidth = 460
     end
     object pnlTopMessage: TPanel
       Left = 0
       Top = 0
-      Width = 466
+      Width = 530
       Height = 53
       Align = alTop
       BevelOuter = bvNone
       TabOrder = 1
+      ExplicitWidth = 466
       DesignSize = (
-        466
+        530
         53)
       object lblTask: TLabel
         Left = 8
@@ -182,7 +191,7 @@ object GitStatusView: TGitStatusView
         Caption = 'Task Description:'
       end
       object btnConfig: TButton
-        Left = 392
+        Left = 456
         Top = 11
         Width = 66
         Height = 35
@@ -192,6 +201,7 @@ object GitStatusView: TGitStatusView
         Images = ImageList1
         TabOrder = 2
         OnClick = btnConfigClick
+        ExplicitLeft = 392
       end
       object edtTaskNum: TEdit
         Left = 5
@@ -203,25 +213,27 @@ object GitStatusView: TGitStatusView
       object edtTaskDesc: TEdit
         Left = 100
         Top = 31
-        Width = 277
+        Width = 341
         Height = 21
         Anchors = [akLeft, akTop, akRight]
         TabOrder = 1
+        ExplicitWidth = 277
       end
     end
     object Panel1: TPanel
       Left = 0
       Top = 223
-      Width = 466
+      Width = 530
       Height = 44
       Align = alBottom
       BevelOuter = bvNone
       TabOrder = 2
+      ExplicitWidth = 466
       DesignSize = (
-        466
+        530
         44)
       object btnSuggest: TButton
-        Left = 216
+        Left = 280
         Top = 6
         Width = 100
         Height = 35
@@ -231,9 +243,10 @@ object GitStatusView: TGitStatusView
         Images = ImageList1
         TabOrder = 0
         OnClick = btnSuggestClick
+        ExplicitLeft = 216
       end
       object btnCommit: TButton
-        Left = 320
+        Left = 384
         Top = 6
         Width = 141
         Height = 35
@@ -243,10 +256,11 @@ object GitStatusView: TGitStatusView
         Images = ImageList1
         TabOrder = 1
         OnClick = btnCommitClick
+        ExplicitLeft = 320
       end
     end
     object btnCopy: TButton
-      Left = 416
+      Left = 480
       Top = 67
       Width = 27
       Height = 32
@@ -255,17 +269,19 @@ object GitStatusView: TGitStatusView
       Images = ImageList1
       TabOrder = 3
       OnClick = btnCopyClick
+      ExplicitLeft = 416
     end
   end
   object chkSelectAll: TCheckBox
     Left = 0
     Top = 49
-    Width = 466
+    Width = 530
     Height = 17
     Align = alTop
     Caption = 'Select All'
     TabOrder = 3
     OnClick = chkSelectAllClick
+    ExplicitWidth = 466
   end
   object pmStatus: TPopupMenu
     Left = 96
@@ -290,7 +306,7 @@ object GitStatusView: TGitStatusView
     Left = 184
     Top = 152
     Bitmap = {
-      494C010107000800700018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C010107000800740018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000600000003000000001002000000000000048
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000200000
