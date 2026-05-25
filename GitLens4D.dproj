@@ -149,9 +149,6 @@
         <DCCReference Include="src\GitLens4D.IDE.SettingsView.pas">
             <Form>GitSettingsView</Form>
         </DCCReference>
-        <DCCReference Include="src\GitLens4D.IDE.AIConfigView.pas">
-            <Form>GitAIConfigView</Form>
-        </DCCReference>
         <DCCReference Include="src\GitLens4D.IDE.DiffView.pas">
             <Form>GitDiffView</Form>
         </DCCReference>

@@ -109,7 +109,7 @@ var
 implementation
 
 uses
-  GitLens4D.IDE.AIConfigView,
+  GitLens4D.IDE.SettingsView,
   GitLens4D.IDE.DiffView,
   GitLens4D.IDE.PRView,
   GitLens4D.Git.ProjectProvider;
@@ -331,7 +331,7 @@ end;
 
 procedure TGitStatusView.btnConfigClick(Sender: TObject);
 begin
-  ShowAIConfig(FSettings);
+  ShowSettings(FSettings, True);
 end;
 
 procedure TGitStatusView.LoadSettings;

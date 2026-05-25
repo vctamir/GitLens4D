@@ -53,7 +53,6 @@ contains
   GitLens4D.IDE.PRView in 'src\GitLens4D.IDE.PRView.pas' {GitPRView},
   GitLens4D.IDE.HistoryView in 'src\GitLens4D.IDE.HistoryView.pas' {GitHistoryView},
   GitLens4D.IDE.SettingsView in 'src\GitLens4D.IDE.SettingsView.pas' {GitSettingsView},
-  GitLens4D.IDE.AIConfigView in 'src\GitLens4D.IDE.AIConfigView.pas' {GitAIConfigView},
   GitLens4D.IDE.DiffView in 'src\GitLens4D.IDE.DiffView.pas' {GitDiffView},
   GitLens4D.Settings in 'src\GitLens4D.Settings.pas',
   GitLens4D.Wizard in 'src\GitLens4D.Wizard.pas';

@@ -273,7 +273,7 @@ end;
 
 procedure TGitLens4D.OnSettingsAction;
 begin
-  ShowGeneralSettings(FSettings);
+  ShowSettings(FSettings);
   ReloadShortcuts;
 end;
 
