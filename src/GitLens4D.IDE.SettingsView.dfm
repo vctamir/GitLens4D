@@ -53,14 +53,8 @@ object GitSettingsView: TGitSettingsView
     ActivePage = tsGeneral
     Align = alClient
     TabOrder = 1
-    ExplicitLeft = 0
-    ExplicitTop = 0
-    ExplicitWidth = 450
-    ExplicitHeight = 310
     object tsGeneral: TTabSheet
       Caption = 'Geral'
-      ExplicitWidth = 442
-      ExplicitHeight = 282
       object grpShortcuts: TGroupBox
         Left = 10
         Top = 10
@@ -138,6 +132,8 @@ object GitSettingsView: TGitSettingsView
     object tsAI: TTabSheet
       Caption = 'Intelig'#234'ncia Artificial'
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
       ExplicitWidth = 442
       ExplicitHeight = 282
       object lblType: TLabel
