@@ -152,6 +152,8 @@ procedure TGitStatusView.DoShow;
 begin
   inherited;
   ApplyTheme;
+  RefreshStatus;
+  RefreshBranches;
 end;
 
 procedure TGitStatusView.ApplyTheme;
@@ -453,10 +455,6 @@ begin
 
   Result := LPath + AItem.Caption;
   Result := StringReplace(Result, '\', '/', [rfReplaceAll]);
-
-  // Remove prefixo ./ se existir, para o git ser mais limpo
-  if Result.StartsWith('./') then
-    Delete(Result, 1, 2);
 end;
 
 procedure TGitStatusView.UpdateCommitMsg(const AText: string);
@@ -548,8 +546,8 @@ end;
 
 procedure TGitStatusView.RefreshStatus;
 begin
-  if Assigned(FProvider) and (FProjectDir <> '') then
-    UpdateList(FProvider.GetStatus(FProjectDir));
+  if Assigned(FProvider) and (FRepoRoot <> '') then
+    UpdateList(FProvider.GetStatus(FRepoRoot));
 end;
 
 procedure TGitStatusView.UpdateList(const AFiles: TGitFileStatusArray);
@@ -576,11 +574,15 @@ begin
       for I := 0 to High(AFiles) do
       begin
         Item         := lstFiles.Items.Add;
-        LFileName    := FProjectDir + AFiles[I].FileName.Replace('/', '\', [rfReplaceAll]);
+        LFileName    := AFiles[I].FileName.Replace('/', '\');
         Item.Caption := ExtractFileName(LFileName);
-        LPath        := ExtractFilePath(LFileName).Replace(FProjectDir, '.\', [rfIgnoreCase]).Trim(['\']);
+        
+        LPath        := ExtractFilePath(LFileName);
         if LPath = '' then
-          LPath := '.\';
+          LPath := '.\'
+        else
+          LPath := '.\' + LPath.Trim(['\']);
+          
         Item.SubItems.Add(LPath);
 
         case AFiles[I].Status of
@@ -593,7 +595,9 @@ begin
             Item.SubItems.Add('Unknown');
         end;
 
-        // Armazena o tipo de status para uso posterior (ex: Diff)
+        // Armazena o path relativo original (do git) no Data ou em um local seguro
+        // Aqui vamos reconstruir no GetRelativeFile baseado no Caption e SubItems[0]
+        
         Item.Data := Pointer(AFiles[I].Status);
 
         if AFiles[I].Staged then
@@ -637,14 +641,14 @@ begin
   begin
     // Para arquivos novos, mostramos o conteúdo inteiro como adicionado (+)
     try
-      LDiffText := FRunner.Execute(Format('git diff --no-index -- NUL "%s"', [LRelativeFile]), FProjectDir);
+      LDiffText := FRunner.Execute(Format('git diff --no-index -- NUL "%s"', [LRelativeFile]), FRepoRoot);
       // Se falhar ou NUL não funcionar, tenta ler o arquivo e prefixar com +
       if LDiffText.Trim = '' then
       begin
         LDiffText := '--- /dev/null' + sLineBreak +
           '+++ b/' + LRelativeFile + sLineBreak +
           '@@ -0,0 +1 @@' + sLineBreak +
-          '+' + StringReplace(TFile.ReadAllText(FProjectDir + LRelativeFile.Replace('/', '\')), sLineBreak, sLineBreak + '+', [rfReplaceAll]);
+          '+' + StringReplace(TFile.ReadAllText(FRepoRoot + LRelativeFile.Replace('/', '\')), sLineBreak, sLineBreak + '+', [rfReplaceAll]);
       end;
     except
       on E: Exception do
@@ -653,7 +657,7 @@ begin
   end
   else
   begin
-    LDiffText := FRunner.GetDiff(LRelativeFile, FProjectDir);
+    LDiffText := FRunner.GetDiff(LRelativeFile, FRepoRoot);
   end;
 
   if LDiffText.Trim = '' then
@@ -676,7 +680,7 @@ begin
   if MessageDlg(('Deseja realmente DESCARTAR todas as alterações do arquivo:') + sLineBreak + LFile + '?',
     mtConfirmation, [mbYes, mbNo], 0) = mrYes then
   begin
-    FRunner.DiscardChanges(LFile, FProjectDir);
+    FRunner.DiscardChanges(LFile, FRepoRoot);
     RefreshStatus;
   end;
 end;
