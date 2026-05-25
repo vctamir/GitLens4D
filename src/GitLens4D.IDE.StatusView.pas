@@ -181,7 +181,7 @@ var
 begin
   if Supports(BorlandIDEServices, IOTAModuleServices, ModSvc) then
   begin
-    if MessageDlg(UTF8ToString('Deseja salvar todas as alterações pendentes no IDE antes de prosseguir?'),
+    if MessageDlg(('Deseja salvar todas as alterações pendentes no IDE antes de prosseguir?'),
       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
     begin
       ModSvc.SaveAll;
@@ -211,7 +211,7 @@ begin
 
   if HasChanges then
   begin
-    if MessageDlg(UTF8ToString('Existem arquivos com mudanças não comitadas (Modified/Deleted).') + sLineBreak +
+    if MessageDlg(('Existem arquivos com mudanças não comitadas (Modified/Deleted).') + sLineBreak +
       UTF8ToString('Deseja fazer o commit antes de prosseguir?'), mtWarning, [mbYes, mbNo], 0) = mrYes then
     begin
       Abort;
@@ -673,7 +673,7 @@ begin
   if LFile = '' then
     Exit;
 
-  if MessageDlg(UTF8ToString('Deseja realmente DESCARTAR todas as alterações do arquivo:') + sLineBreak + LFile + '?',
+  if MessageDlg(('Deseja realmente DESCARTAR todas as alterações do arquivo:') + sLineBreak + LFile + '?',
     mtConfirmation, [mbYes, mbNo], 0) = mrYes then
   begin
     FRunner.DiscardChanges(LFile, FProjectDir);
