@@ -27,6 +27,7 @@ package GitLens4D;
 {$ENDIF IMPLICITBUILDING}
 {$IMPLICITBUILD ON}
 
+
 requires
   designide,
   rtl,
@@ -49,11 +50,11 @@ contains
   GitLens4D.IDE.Menu in 'src\GitLens4D.IDE.Menu.pas',
   GitLens4D.IDE.Messenger in 'src\GitLens4D.IDE.Messenger.pas',
   GitLens4D.IDE.StatusDock in 'src\GitLens4D.IDE.StatusDock.pas',
-  GitLens4D.IDE.StatusView in 'src\GitLens4D.IDE.StatusView.pas' {GitStatusView},
-  GitLens4D.IDE.PRView in 'src\GitLens4D.IDE.PRView.pas' {GitPRView},
-  GitLens4D.IDE.HistoryView in 'src\GitLens4D.IDE.HistoryView.pas' {GitHistoryView},
-  GitLens4D.IDE.SettingsView in 'src\GitLens4D.IDE.SettingsView.pas' {GitSettingsView},
-  GitLens4D.IDE.DiffView in 'src\GitLens4D.IDE.DiffView.pas' {GitDiffView},
+  GitLens4D.IDE.StatusView in 'src\GitLens4D.IDE.StatusView.pas' { GitStatusView } ,
+  GitLens4D.IDE.PRView in 'src\GitLens4D.IDE.PRView.pas' { GitPRView } ,
+  GitLens4D.IDE.HistoryView in 'src\GitLens4D.IDE.HistoryView.pas' { GitHistoryView } ,
+  GitLens4D.IDE.SettingsView in 'src\GitLens4D.IDE.SettingsView.pas' { GitSettingsView } ,
+  GitLens4D.IDE.DiffView in 'src\GitLens4D.IDE.DiffView.pas' { GitDiffView } ,
   GitLens4D.Settings in 'src\GitLens4D.Settings.pas',
   GitLens4D.Wizard in 'src\GitLens4D.Wizard.pas';
 

@@ -1,4 +1,4 @@
-unit GitLens4D.IDE.DiffView;
+﻿unit GitLens4D.IDE.DiffView;
 
 { ============================================================================
   GitLens4D - Visualizador de Diferenças (Diff)
@@ -11,9 +11,20 @@ unit GitLens4D.IDE.DiffView;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, Winapi.RichEdit, System.SysUtils, System.Variants, System.Classes,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ComCtrls,
-  Vcl.ExtCtrls, ToolsAPI;
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.RichEdit,
+  System.SysUtils,
+  System.Variants,
+  System.Classes,
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Dialogs,
+  Vcl.StdCtrls,
+  Vcl.ComCtrls,
+  Vcl.ExtCtrls,
+  ToolsAPI;
 
 type
   TGitDiffView = class(TForm)
@@ -34,6 +45,7 @@ implementation
 
 {$R *.dfm}
 
+
 procedure ShowDiff(const AFileName, ADiffText: string);
 var
   Frm: TGitDiffView;
@@ -51,8 +63,8 @@ end;
 constructor TGitDiffView.Create(AOwner: TComponent; const AFileName, ADiffText: string);
 var
   Lines: TStringList;
-  I: Integer;
-  Line: string;
+  I    : Integer;
+  Line : string;
 begin
   inherited Create(AOwner);
   Caption := 'Diff: ' + AFileName;
@@ -88,25 +100,25 @@ procedure TGitDiffView.AddColoredLine(const AText: string; AColor: TColor);
 var
   Format: TCharFormat2;
 begin
-  redDiff.SelStart := Length(redDiff.Text);
+  redDiff.SelStart            := Length(redDiff.Text);
   redDiff.SelAttributes.Color := clBlack;
   redDiff.Lines.Add(AText);
-  
+
   if AColor <> clWindowText then
   begin
-    redDiff.SelStart := Length(redDiff.Text) - Length(AText) - 2;
+    redDiff.SelStart  := Length(redDiff.Text) - Length(AText) - 2;
     redDiff.SelLength := Length(AText) + 1;
-    
+
     FillChar(Format, SizeOf(Format), 0);
-    Format.cbSize := SizeOf(Format);
-    Format.dwMask := CFM_BACKCOLOR;
+    Format.cbSize      := SizeOf(Format);
+    Format.dwMask      := CFM_BACKCOLOR;
     Format.crBackColor := ColorToRGB(AColor);
-    
+
     SendMessage(redDiff.Handle, EM_SETCHARFORMAT, SCF_SELECTION, LPARAM(@Format));
     redDiff.SelAttributes.Style := [fsBold];
   end;
-  
-  redDiff.SelStart := Length(redDiff.Text);
+
+  redDiff.SelStart  := Length(redDiff.Text);
   redDiff.SelLength := 0;
 end;
 

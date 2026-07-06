@@ -1,11 +1,23 @@
-unit GitLens4D.IDE.HistoryView;
+﻿unit GitLens4D.IDE.HistoryView;
 
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, Winapi.RichEdit, System.SysUtils, System.Variants, System.Classes,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls,
-  Vcl.ExtCtrls, GitLens4D.Interfaces, ToolsAPI;
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.RichEdit,
+  System.SysUtils,
+  System.Variants,
+  System.Classes,
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Dialogs,
+  Vcl.ComCtrls,
+  Vcl.StdCtrls,
+  Vcl.ExtCtrls,
+  GitLens4D.Interfaces,
+  ToolsAPI;
 
 type
   TGitHistoryView = class(TForm)
@@ -30,6 +42,7 @@ implementation
 
 {$R *.dfm}
 
+
 procedure ShowHistoryWindow(const AFileName: string; ALine: Integer; AHistory: TGitHistoryArray);
 var
   LForm: TGitHistoryView;
@@ -44,12 +57,12 @@ end;
 
 constructor TGitHistoryView.Create(AOwner: TComponent; const AFileName: string; ALine: Integer; AHistory: TGitHistoryArray);
 var
-  I: Integer;
+  I    : Integer;
   LItem: TListItem;
 begin
   inherited Create(AOwner);
   FHistory := AHistory;
-  Caption := Format('Line Evolution: %s (Line %d)', [ExtractFileName(AFileName), ALine]);
+  Caption  := Format('Line Evolution: %s (Line %d)', [ExtractFileName(AFileName), ALine]);
   ApplyTheme;
 
   lstHistory.Items.BeginUpdate;
@@ -57,7 +70,7 @@ begin
     lstHistory.Items.Clear;
     for I := 0 to High(FHistory) do
     begin
-      LItem := lstHistory.Items.Add;
+      LItem         := lstHistory.Items.Add;
       LItem.Caption := FHistory[I].Hash;
       LItem.SubItems.Add(FHistory[I].Author);
       LItem.SubItems.Add(FHistory[I].Date);
@@ -67,31 +80,32 @@ begin
   finally
     lstHistory.Items.EndUpdate;
   end;
-  
+
   if lstHistory.Items.Count > 0 then
     lstHistory.ItemIndex := 0;
 end;
 
 procedure TGitHistoryView.lstHistorySelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
 var
-  LIdx: Integer;
+  LIdx  : Integer;
   LPatch: string;
-  Lines: TStringList;
-  I: Integer;
-  Line: string;
+  Lines : TStringList;
+  I     : Integer;
+  Line  : string;
 begin
-  if not Selected then Exit;
-  
-  LIdx := Integer(Item.Data);
+  if not Selected then
+    Exit;
+
+  LIdx   := Integer(Item.Data);
   LPatch := FHistory[LIdx].Patch;
-  
+
   redPatch.Lines.BeginUpdate;
   try
     redPatch.Clear;
     Lines := TStringList.Create;
     try
       Lines.Text := LPatch;
-      for I := 0 to Lines.Count - 1 do
+      for I      := 0 to Lines.Count - 1 do
       begin
         Line := Lines[I];
         if Line.StartsWith('+') then
@@ -115,24 +129,24 @@ procedure TGitHistoryView.AddColoredLine(const AText: string; AColor: TColor);
 var
   Format: TCharFormat2;
 begin
-  redPatch.SelStart := Length(redPatch.Text);
+  redPatch.SelStart            := Length(redPatch.Text);
   redPatch.SelAttributes.Color := clBlack;
   redPatch.Lines.Add(AText);
-  
+
   if AColor <> clWindowText then
   begin
-    redPatch.SelStart := Length(redPatch.Text) - Length(AText) - 2;
+    redPatch.SelStart  := Length(redPatch.Text) - Length(AText) - 2;
     redPatch.SelLength := Length(AText) + 1;
-    
+
     FillChar(Format, SizeOf(Format), 0);
-    Format.cbSize := SizeOf(Format);
-    Format.dwMask := CFM_BACKCOLOR;
+    Format.cbSize      := SizeOf(Format);
+    Format.dwMask      := CFM_BACKCOLOR;
     Format.crBackColor := ColorToRGB(AColor);
-    
+
     SendMessage(redPatch.Handle, EM_SETCHARFORMAT, SCF_SELECTION, LPARAM(@Format));
   end;
-  
-  redPatch.SelStart := Length(redPatch.Text);
+
+  redPatch.SelStart  := Length(redPatch.Text);
   redPatch.SelLength := 0;
 end;
 

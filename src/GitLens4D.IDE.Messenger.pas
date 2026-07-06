@@ -26,7 +26,7 @@ uses
 type
   TIDEMessenger = class(TInterfacedObject, IIDEMessenger)
   private
-    FMsgGroup: IOTAMessageGroup;
+    FMsgGroup : IOTAMessageGroup;
     FFirstShow: Boolean;
     function EnsureGroup(const ASvc: IOTAMessageServices): IOTAMessageGroup;
   public

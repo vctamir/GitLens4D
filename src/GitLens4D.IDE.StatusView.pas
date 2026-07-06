@@ -213,7 +213,7 @@ begin
     cbBranches.Items.Assign(BranchList);
     Current              := FRunner.GetCurrentBranch(FProjectDir);
     cbBranches.ItemIndex := cbBranches.Items.IndexOf(Current);
-    
+
     // Atualiza contador de Push
     try
       AheadCount := FRunner.GetAheadCount(FProjectDir);
@@ -333,7 +333,7 @@ end;
 
 procedure TGitStatusView.SaveSettings;
 var
-  I: Integer;
+  I        : Integer;
   LSelected: TStringList;
 begin
   if Assigned(FSettings) then
@@ -387,7 +387,7 @@ begin
 
   // 3. Comita apenas o que foi adicionado (sem o -a)
   LOutput := FRunner.Execute(Format('git commit -m "%s"', [Msg]), FProjectDir);
-  
+
   if (Pos('error', LOutput) > 0) or (Pos('fatal', LOutput) > 0) then
   begin
     ShowMessage(UTF8ToString('Erro ao realizar commit:') + sLineBreak + LOutput);
@@ -398,7 +398,7 @@ begin
   if Assigned(FSettings) then
   begin
     FSettings.SaveTaskInfo(edtTaskNum.Text, edtTaskDesc.Text);
-    FSettings.SaveCommitDraft(''); // Limpa rascunho após commit
+    FSettings.SaveCommitDraft('');   // Limpa rascunho após commit
     FSettings.SaveSelectedFiles(''); // Limpa seleção após commit
   end;
 
@@ -554,13 +554,13 @@ begin
         Item         := lstFiles.Items.Add;
         LFileName    := AFiles[I].FileName.Replace('/', '\');
         Item.Caption := ExtractFileName(LFileName);
-        
-        LPath        := ExtractFilePath(LFileName);
+
+        LPath := ExtractFilePath(LFileName);
         if LPath = '' then
           LPath := '.\'
         else
           LPath := '.\' + LPath.Trim(['\']);
-          
+
         Item.SubItems.Add(LPath);
 
         case AFiles[I].Status of
@@ -575,7 +575,7 @@ begin
 
         // Armazena o path relativo original (do git) no Data ou em um local seguro
         // Aqui vamos reconstruir no GetRelativeFile baseado no Caption e SubItems[0]
-        
+
         Item.Data := Pointer(AFiles[I].Status);
 
         if AFiles[I].Staged then

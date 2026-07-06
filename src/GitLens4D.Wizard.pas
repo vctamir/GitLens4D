@@ -1,4 +1,4 @@
-unit GitLens4D.Wizard;
+﻿unit GitLens4D.Wizard;
 
 { ============================================================================
   GitLens4D - Wizard Principal (Orquestrador)
@@ -32,7 +32,7 @@ type
     FBlameParser: IBlameParser;
     FHistParser : IHistoryParser;
     FStatusProv : IGitStatusProvider;
-    FAIService   : IAIService;
+    FAIService  : IAIService;
     FMessenger  : IIDEMessenger;
 
     // Componentes visuais/IDE (owned, não são interfaces)
@@ -114,8 +114,8 @@ begin
   PathResolver := TGitPathResolver.Create;
   FGitPath     := PathResolver.Resolve;
 
-  FStatusProv  := TGitStatusProvider.Create(FGitPath, FRunner, TStatusParser.Create);
-  FAIService    := TAIService.Create(FSettings);
+  FStatusProv := TGitStatusProvider.Create(FGitPath, FRunner, TStatusParser.Create);
+  FAIService  := TAIService.Create(FSettings);
   RegisterStatusWindow(FStatusProv, FRunner, FSettings, FAIService);
 
   // ── Componentes do IDE ───────────────────────────────────────────────
@@ -147,7 +147,7 @@ end;
 
 procedure TGitLens4D.ReloadShortcuts;
 var
-  KeySvc: IOTAKeyboardServices;
+  KeySvc               : IOTAKeyboardServices;
   LHist, LChanges, LTag: string;
 begin
   if Supports(BorlandIDEServices, IOTAKeyboardServices, KeySvc) then
@@ -333,24 +333,25 @@ end;
 
 procedure TGitLens4D.ShowGitHistory(const AFile: string; ALine: Integer);
 var
-  Comando  : string;
-  DirBase  : string;
-  Runner   : IGitRunner;
-  Parser   : IHistoryParser;
+  Comando     : string;
+  DirBase     : string;
+  Runner      : IGitRunner;
+  Parser      : IHistoryParser;
   LStart, LEnd: Integer;
 begin
   if not FileExists(AFile) then
     Exit;
 
-  DirBase   := ExtractFilePath(AFile);
-  Runner    := FRunner;
-  Parser    := FHistParser;
-  
-  LStart := ALine - 2;
-  if LStart < 1 then LStart := 1;
-  LEnd := ALine + 2;
+  DirBase := ExtractFilePath(AFile);
+  Runner  := FRunner;
+  Parser  := FHistParser;
 
-  Comando   := Format(
+  LStart := ALine - 2;
+  if LStart < 1 then
+    LStart := 1;
+  LEnd     := ALine + 2;
+
+  Comando := Format(
     '"%s" log -n 10 -L %d,%d:"%s" ' +
     '--pretty=format:"#LOG#|%%h|%%an|%%ad|%%s" ' +
     '--date=format:"%%d/%%m/%%Y %%H:%%M:%%S"',

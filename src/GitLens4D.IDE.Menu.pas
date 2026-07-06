@@ -1,4 +1,4 @@
-unit GitLens4D.IDE.Menu;
+﻿unit GitLens4D.IDE.Menu;
 
 { ============================================================================
   GitLens4D - Gerenciamento do Menu do IDE
@@ -27,11 +27,11 @@ type
     FMenuHistory : TMenuItem;
     FMenuSettings: TMenuItem;
 
-    FOnEditorToggle   : TMenuToggleEvent;
-    FOnDebugToggle    : TMenuToggleEvent;
-    FOnHistoryAction  : TMenuActionEvent;
-    FOnStatusAction   : TMenuActionEvent;
-    FOnSettingsAction : TMenuActionEvent;
+    FOnEditorToggle  : TMenuToggleEvent;
+    FOnDebugToggle   : TMenuToggleEvent;
+    FOnHistoryAction : TMenuActionEvent;
+    FOnStatusAction  : TMenuActionEvent;
+    FOnSettingsAction: TMenuActionEvent;
 
     procedure MenuEditorClick(Sender: TObject);
     procedure MenuDebugClick(Sender: TObject);

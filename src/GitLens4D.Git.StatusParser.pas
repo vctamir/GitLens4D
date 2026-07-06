@@ -1,4 +1,4 @@
-unit GitLens4D.Git.StatusParser;
+﻿unit GitLens4D.Git.StatusParser;
 
 { ============================================================================
   GitLens4D - Parser para "git status --porcelain"
@@ -29,11 +29,11 @@ uses
 
 function TStatusParser.Parse(const ARawOutput: string): TGitFileStatusArray;
 var
-  Lines: TStringList;
-  I: Integer;
-  Line: string;
+  Lines           : TStringList;
+  I               : Integer;
+  Line            : string;
   StatusX, StatusY: Char;
-  FileName: string;
+  FileName        : string;
 begin
   SetLength(Result, 0);
   if ARawOutput.Trim = '' then
@@ -42,23 +42,23 @@ begin
   Lines := TStringList.Create;
   try
     Lines.Text := ARawOutput;
-    for I := 0 to Lines.Count - 1 do
+    for I      := 0 to Lines.Count - 1 do
     begin
       Line := Lines[I];
       if Line.Length < 4 then
         Continue;
 
-      StatusX := Line[1]; // Index status
-      StatusY := Line[2]; // Worktree status
+      StatusX  := Line[1]; // Index status
+      StatusY  := Line[2]; // Worktree status
       FileName := Copy(Line, 4, MaxInt);
 
-      // Simplificação para este exemplo: Prioriza Worktree se ambos existirem, 
+      // Simplificação para este exemplo: Prioriza Worktree se ambos existirem,
       // ou marca como Staged se estiver apenas no Index.
-      
+
       SetLength(Result, Length(Result) + 1);
       Result[High(Result)].FileName := FileName;
       Result[High(Result)].Staged   := (StatusX <> ' ') and (StatusX <> '?');
-      
+
       case StatusY of
         'M': Result[High(Result)].Status := skModified;
         'D': Result[High(Result)].Status := skDeleted;
@@ -71,7 +71,7 @@ begin
           'D': Result[High(Result)].Status := skDeleted;
           'R': Result[High(Result)].Status := skRenamed;
         else
-          Result[High(Result)].Status := skUnknown;
+            Result[High(Result)].Status := skUnknown;
         end;
       end;
     end;

@@ -1,4 +1,4 @@
-unit GitLens4D.Git.ProjectProvider;
+﻿unit GitLens4D.Git.ProjectProvider;
 
 { ============================================================================
   GitLens4D - Provedor de Metadados do Projeto Delphi
@@ -33,7 +33,7 @@ var
   LModSvc : IOTAModuleServices;
   LProject: IOTAProject;
 begin
-  Result.ProjectName := 'Unknown';
+  Result.ProjectName    := 'Unknown';
   Result.ProjectVersion := '1.0.0.0';
 
   if Supports(BorlandIDEServices, IOTAModuleServices, LModSvc) then
@@ -55,7 +55,7 @@ begin
           if (Result.ProjectVersion = '') or (Result.ProjectVersion = '1.0.0.0') or (Result.ProjectVersion = '0.0.0.0') then
           begin
             // Fallback 1: MajorVersion
-            Result.ProjectVersion := 
+            Result.ProjectVersion :=
               VarToStrDef(LProject.ProjectOptions.Values['MajorVersion'], '1') + '.' +
               VarToStrDef(LProject.ProjectOptions.Values['MinorVersion'], '0') + '.' +
               VarToStrDef(LProject.ProjectOptions.Values['Release'], '0') + '.' +
@@ -64,7 +64,7 @@ begin
             // Fallback 2: VerInfo_MajorVer (Padrão ToolsAPI em algumas versões do Tokyo)
             if (Result.ProjectVersion = '1.0.0.0') or (Result.ProjectVersion = '0.0.0.0') then
             begin
-              Result.ProjectVersion := 
+              Result.ProjectVersion :=
                 IfThen(VarToStrDef(LProject.ProjectOptions.Values['VerInfo_MajorVer'], '1') = '', '1', VarToStrDef(LProject.ProjectOptions.Values['VerInfo_MajorVer'], '1')) + '.' +
                 IfThen(VarToStrDef(LProject.ProjectOptions.Values['VerInfo_MinorVer'], '0') = '', '0', VarToStrDef(LProject.ProjectOptions.Values['VerInfo_MinorVer'], '0')) + '.' +
                 IfThen(VarToStrDef(LProject.ProjectOptions.Values['VerInfo_Release'], '0') = '', '0', VarToStrDef(LProject.ProjectOptions.Values['VerInfo_Release'], '0')) + '.' +

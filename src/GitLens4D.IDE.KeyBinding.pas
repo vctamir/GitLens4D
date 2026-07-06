@@ -1,4 +1,4 @@
-unit GitLens4D.IDE.KeyBinding;
+﻿unit GitLens4D.IDE.KeyBinding;
 
 { ============================================================================
   GitLens4D - Atalho de Teclado
@@ -19,9 +19,9 @@ type
 
   TGitLensKeyboardBinding = class(TNotifierObject, IOTAKeyboardBinding)
   private
-    FOnHistory: TKeyShortcutEvent;
-    FOnStatus: TKeyShortcutEvent;
-    FShortcutHist: string;
+    FOnHistory      : TKeyShortcutEvent;
+    FOnStatus       : TKeyShortcutEvent;
+    FShortcutHist   : string;
     FShortcutChanges: string;
     procedure ExecuteHistoryShortcut(const Context: IOTAKeyContext;
       KeyCode: TShortCut;
@@ -48,9 +48,9 @@ uses
 constructor TGitLensKeyboardBinding.Create(AOnHistory, AOnStatus: TKeyShortcutEvent; const AHist, AChanges: string);
 begin
   inherited Create;
-  FOnHistory := AOnHistory;
-  FOnStatus  := AOnStatus;
-  FShortcutHist := AHist;
+  FOnHistory       := AOnHistory;
+  FOnStatus        := AOnStatus;
+  FShortcutHist    := AHist;
   FShortcutChanges := AChanges;
 end;
 
@@ -71,7 +71,7 @@ end;
 
 procedure TGitLensKeyboardBinding.BindKeyboard(const BindingServices: IOTAKeyBindingServices);
 var
-  LSHist, LSChanges: TShortcut;
+  LSHist, LSChanges: TShortCut;
 begin
   if FShortcutHist <> '' then
   begin

@@ -39,6 +39,9 @@ object GitDiffView: TGitDiffView
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 1
+    DesignSize = (
+      700
+      40)
     object btnClose: TButton
       Left = 616
       Top = 8

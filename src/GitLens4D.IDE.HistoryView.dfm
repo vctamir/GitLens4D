@@ -31,6 +31,9 @@ object GitHistoryView: TGitHistoryView
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 0
+    DesignSize = (
+      700
+      40)
     object btnClose: TButton
       Left = 610
       Top = 6
@@ -90,5 +93,6 @@ object GitHistoryView: TGitHistoryView
     ScrollBars = ssBoth
     TabOrder = 2
     WordWrap = False
+    Zoom = 100
   end
 end

@@ -120,12 +120,12 @@ end;
 
 procedure TGitPRView.btnSuggestClick(Sender: TObject);
 var
-  LDiff              : string;
-  LView              : TGitPRView;
-  LSvc               : IAIService;
-  LNum, LDesc        : string;
-  LSuggestion        : string;
-  LMetadata          : TGitProjectMetadata;
+  LDiff      : string;
+  LView      : TGitPRView;
+  LSvc       : IAIService;
+  LNum, LDesc: string;
+  LSuggestion: string;
+  LMetadata  : TGitProjectMetadata;
 begin
   if not Assigned(FAIService) then
     Exit;

@@ -3,9 +3,20 @@
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  Vcl.ComCtrls, GitLens4D.Interfaces, ToolsAPI;
+  Winapi.Windows,
+  Winapi.Messages,
+  System.SysUtils,
+  System.Variants,
+  System.Classes,
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Dialogs,
+  Vcl.StdCtrls,
+  Vcl.ExtCtrls,
+  Vcl.ComCtrls,
+  GitLens4D.Interfaces,
+  ToolsAPI;
 
 type
   TGitSettingsView = class(TForm)
@@ -56,6 +67,7 @@ implementation
 
 {$R *.dfm}
 
+
 procedure ShowSettings(ASettings: ISettingsRepository; ADefaultAI: Boolean = False);
 var
   LForm: TGitSettingsView;
@@ -98,10 +110,10 @@ end;
 
 procedure TGitSettingsView.LoadConfigs;
 var
-  LHist, LChanges, LTag: string;
+  LHist, LChanges, LTag                : string;
   LType, LEndpoint, LKey, LModel, LLang: string;
-  LTemp: Double;
-  LMaxTokens: Integer;
+  LTemp                                : Double;
+  LMaxTokens                           : Integer;
 begin
   if Assigned(FSettings) then
   begin
@@ -114,15 +126,17 @@ begin
     // IA
     FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
     cbType.ItemIndex := cbType.Items.IndexOf(LType);
-    if cbType.ItemIndex = -1 then cbType.ItemIndex := 0;
+    if cbType.ItemIndex = -1 then
+      cbType.ItemIndex := 0;
 
     cbLang.ItemIndex := cbLang.Items.IndexOf(LLang);
-    if cbLang.ItemIndex = -1 then cbLang.ItemIndex := 0;
+    if cbLang.ItemIndex = -1 then
+      cbLang.ItemIndex := 0;
 
-    edtEndpoint.Text := LEndpoint;
-    edtKey.Text := LKey;
-    edtModel.Text := LModel;
-    edtTemp.Text := FloatToStr(LTemp);
+    edtEndpoint.Text  := LEndpoint;
+    edtKey.Text       := LKey;
+    edtModel.Text     := LModel;
+    edtTemp.Text      := FloatToStr(LTemp);
     edtMaxTokens.Text := IntToStr(LMaxTokens);
   end;
 end;
@@ -138,14 +152,16 @@ begin
       edtShortcutHist.Text,
       edtShortcutChanges.Text,
       edtCommitTag.Text
-    );
+      );
 
     // Salvar IA
     LType := 'Local';
-    if cbType.ItemIndex <> -1 then LType := cbType.Items[cbType.ItemIndex];
+    if cbType.ItemIndex <> -1 then
+      LType := cbType.Items[cbType.ItemIndex];
 
     LLang := 'pt-BR';
-    if cbLang.ItemIndex <> -1 then LLang := cbLang.Items[cbLang.ItemIndex];
+    if cbLang.ItemIndex <> -1 then
+      LLang := cbLang.Items[cbLang.ItemIndex];
 
     FSettings.SaveAIConfig(LType, edtEndpoint.Text, edtKey.Text, edtModel.Text, LLang,
       StrToFloatDef(edtTemp.Text, 0.7), StrToIntDef(edtMaxTokens.Text, 2048));

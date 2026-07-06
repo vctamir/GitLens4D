@@ -1,4 +1,4 @@
-unit GitLens4D.Git.StatusProvider;
+﻿unit GitLens4D.Git.StatusProvider;
 
 { ============================================================================
   GitLens4D - Provedor de Status do Repositório
@@ -17,8 +17,8 @@ type
   TGitStatusProvider = class(TInterfacedObject, IGitStatusProvider)
   private
     FGitPath: string;
-    FRunner: IGitRunner;
-    FParser: IStatusParser;
+    FRunner : IGitRunner;
+    FParser : IStatusParser;
   public
     constructor Create(const AGitPath: string; ARunner: IGitRunner; AParser: IStatusParser);
     function GetStatus(const ABaseDir: string): TGitFileStatusArray;
@@ -41,12 +41,12 @@ end;
 
 function TGitStatusProvider.GetStatus(const ABaseDir: string): TGitFileStatusArray;
 var
-  Command: string;
+  Command  : string;
   RawOutput: string;
 begin
-  Command := Format('"%s" status --porcelain', [FGitPath]);
+  Command   := Format('"%s" status --porcelain', [FGitPath]);
   RawOutput := FRunner.Execute(Command, ABaseDir);
-  Result := FParser.Parse(RawOutput);
+  Result    := FParser.Parse(RawOutput);
 end;
 
 end.

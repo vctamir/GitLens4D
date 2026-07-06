@@ -1,4 +1,4 @@
-unit GitLens4D.Git.Runner;
+﻿unit GitLens4D.Git.Runner;
 
 { ============================================================================
   GitLens4D - Executor de Comandos Git
@@ -55,12 +55,12 @@ function TGitRunner.GetBranches(const ABaseDir: string): TStringList;
 var
   Command: string;
   PathSvc: IGitPathResolver;
-  Raw: string;
+  Raw    : string;
 begin
-  Result := TStringList.Create;
-  PathSvc := TGitPathResolver.Create;
-  Command := Format('"%s" branch --format="%%(refname:short)"', [PathSvc.Resolve]);
-  Raw := Execute(Command, ABaseDir);
+  Result      := TStringList.Create;
+  PathSvc     := TGitPathResolver.Create;
+  Command     := Format('"%s" branch --format="%%(refname:short)"', [PathSvc.Resolve]);
+  Raw         := Execute(Command, ABaseDir);
   Result.Text := Raw.Trim;
 end;
 
@@ -103,12 +103,12 @@ begin
   PathSvc := TGitPathResolver.Create;
   Command := Format('"%s" pull', [PathSvc.Resolve]);
   LOutput := Execute(Command, ABaseDir);
-  
+
   if (Pos('CONFLICT', LOutput) > 0) or (Pos('Automatic merge failed', LOutput) > 0) then
   begin
     Execute(Format('"%s" merge --abort', [PathSvc.Resolve]), ABaseDir);
-    raise Exception.Create('Conflito detectado durante o Pull!' + sLineBreak + 
-                           'A operação foi abortada automaticamente para evitar inconsistências no seu código.');
+    raise Exception.Create('Conflito detectado durante o Pull!' + sLineBreak +
+      'A operação foi abortada automaticamente para evitar inconsistências no seu código.');
   end;
 end;
 
@@ -149,12 +149,12 @@ var
   PathSvc: IGitPathResolver;
   LOutput: string;
 begin
-  Result := 0;
+  Result  := 0;
   PathSvc := TGitPathResolver.Create;
   // Conta commits que estão no HEAD mas não estão no upstream (@{u})
   Command := Format('"%s" rev-list --count @{u}..HEAD', [PathSvc.Resolve]);
   LOutput := Execute(Command, ABaseDir).Trim;
-  
+
   if LOutput <> '' then
     Result := StrToIntDef(LOutput, 0);
 end;

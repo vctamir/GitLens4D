@@ -1,4 +1,4 @@
-unit GitLens4D.Git.HistoryParser;
+﻿unit GitLens4D.Git.HistoryParser;
 
 { ============================================================================
   GitLens4D - Parser da saída do "git log -L"
@@ -27,25 +27,25 @@ uses
 
 function THistoryParser.Parse(const ARawOutput: string; ALine: Integer): TGitHistoryArray;
 var
-  Linhas     : TStringList;
-  StrAtual   : string;
-  CommitIdx  : Integer;
-  Partes     : TArray<string>;
-  I          : Integer;
-  LCurrentPatch: TStringList;
-  HunkInfo   : string;
+  Linhas         : TStringList;
+  StrAtual       : string;
+  CommitIdx      : Integer;
+  Partes         : TArray<string>;
+  I              : Integer;
+  LCurrentPatch  : TStringList;
+  HunkInfo       : string;
   LBefore, LAfter: string;
-  P1, P2     : Integer;
+  P1, P2         : Integer;
 begin
   SetLength(Result, 0);
   if (ARawOutput = '') or (Pos('fatal:', LowerCase(ARawOutput)) > 0) then
     Exit;
 
-  Linhas := TStringList.Create;
+  Linhas        := TStringList.Create;
   LCurrentPatch := TStringList.Create;
   try
     Linhas.Text := ARawOutput;
-    CommitIdx := -1;
+    CommitIdx   := -1;
 
     for I := 0 to Linhas.Count - 1 do
     begin
@@ -59,44 +59,46 @@ begin
           Result[CommitIdx].Patch := LCurrentPatch.Text;
 
         LCurrentPatch.Clear;
-        
+
         Partes := StrAtual.Split(['|']);
         if Length(Partes) >= 5 then
         begin
           SetLength(Result, Length(Result) + 1);
-          CommitIdx := High(Result);
-          Result[CommitIdx].Hash     := Partes[1];
-          Result[CommitIdx].Author    := Partes[2];
-          Result[CommitIdx].Date      := Partes[3];
-          Result[CommitIdx].Message   := Partes[4];
-          Result[CommitIdx].Patch     := '';
+          CommitIdx                 := High(Result);
+          Result[CommitIdx].Hash    := Partes[1];
+          Result[CommitIdx].Author  := Partes[2];
+          Result[CommitIdx].Date    := Partes[3];
+          Result[CommitIdx].Message := Partes[4];
+          Result[CommitIdx].Patch   := '';
         end;
       end
       else if CommitIdx >= 0 then
       begin
         // Ignora linhas inúteis do diff
         if (StrAtual.StartsWith('diff')) or (StrAtual.StartsWith('index')) or
-           (StrAtual.StartsWith('---')) or (StrAtual.StartsWith('+++')) then
+          (StrAtual.StartsWith('---')) or (StrAtual.StartsWith('+++')) then
           Continue;
 
         // Traduz cabeçalho de hunk @@ -X,Y +A,B @@ para humano
         if StrAtual.StartsWith('@@') then
         begin
           HunkInfo := StrAtual.Replace('@@', '', [rfReplaceAll]).Trim;
-          Partes := HunkInfo.Split([' ']);
+          Partes   := HunkInfo.Split([' ']);
           if Length(Partes) >= 2 then
           begin
-             LBefore := Partes[0].Replace('-', '');
-             LAfter  := Partes[1].Replace('+', '');
+            LBefore := Partes[0].Replace('-', '');
+            LAfter  := Partes[1].Replace('+', '');
 
-             // Extrai apenas o número da linha inicial (antes da vírgula)
-             P1 := Pos(',', LBefore);
-             if P1 > 0 then LBefore := Copy(LBefore, 1, P1-1);
+            // Extrai apenas o número da linha inicial (antes da vírgula)
+            P1 := Pos(',', LBefore);
+            if P1 > 0 then
+              LBefore := Copy(LBefore, 1, P1 - 1);
 
-             P2 := Pos(',', LAfter);
-             if P2 > 0 then LAfter := Copy(LAfter, 1, P2-1);
+            P2 := Pos(',', LAfter);
+            if P2 > 0 then
+              LAfter := Copy(LAfter, 1, P2 - 1);
 
-             StrAtual := UTF8ToString(Format('@@ ANTES: Linha %s | DEPOIS: Linha %s', [LBefore, LAfter]));
+            StrAtual := UTF8ToString(Format('@@ ANTES: Linha %s | DEPOIS: Linha %s', [LBefore, LAfter]));
           end;
         end;
 

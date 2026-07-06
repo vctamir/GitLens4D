@@ -118,7 +118,7 @@ begin
     'ESTRUTURA OBRIGATÓRIA DA RESPOSTA (substitua apenas [TIPO]; mantenha #' + ATaskNum + ' - ' + ATaskDesc + ' EXATAMENTE como informado acima):' + sLineBreak;
   if LExtraTag <> '' then
     LUser := LUser + LExtraTag + sLineBreak;
-  LUser := LUser + '## [TIPO]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
+  LUser   := LUser + '## [TIPO]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
     '### [VERSAO] ' + AProjName + ' v. ' + AProjVer + sLineBreak +
     sLineBreak +
     '### Detalhamento por arquivo' + sLineBreak +

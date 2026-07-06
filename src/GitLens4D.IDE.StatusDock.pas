@@ -1,4 +1,4 @@
-unit GitLens4D.IDE.StatusDock;
+﻿unit GitLens4D.IDE.StatusDock;
 
 { ============================================================================
   GitLens4D - Gerenciador de Janela de Status (Dockable)
@@ -72,9 +72,9 @@ const
   DOCK_ID = 'QSGitStatusWindow';
 
 var
-  InternalManager: INTACustomDockableForm;
-  GManager       : TStatusDockManager; { referência concreta, só p/ ter um TNotifyEvent válido }
-  GDockForm      : TCustomForm;
+  InternalManager      : INTACustomDockableForm;
+  GManager             : TStatusDockManager; { referência concreta, só p/ ter um TNotifyEvent válido }
+  GDockForm            : TCustomForm;
   GDockFormOldOnDestroy: TNotifyEvent;
 
 procedure RegisterStatusWindow(AProvider: IGitStatusProvider; ARunner: IGitRunner;
@@ -186,7 +186,7 @@ begin
     da IDE estarem totalmente prontos. Qualquer exceção aqui não pode
     escapar: isso derruba o registro do pacote (Register) inteiro. }
   try
-    LFrame := TGitStatusView(AFrame);
+    LFrame            := TGitStatusView(AFrame);
     LFrame.Align      := alClient;
     LFrame.Provider   := FProvider;
     LFrame.Runner     := FRunner;
@@ -283,7 +283,8 @@ end;
 initialization
 
 finalization
-  InternalManager := nil;
-  GManager        := nil;
+
+InternalManager := nil;
+GManager        := nil;
 
 end.

@@ -1,4 +1,4 @@
-unit GitLens4D.Interfaces;
+﻿unit GitLens4D.Interfaces;
 
 { ============================================================================
   GitLens4D - Camada de Contratos (Interfaces)
@@ -53,6 +53,7 @@ type
     Message: string;
     Patch: string; // Conteúdo do código alterado
   end;
+
   TGitHistoryArray = array of TGitHistoryEntry;
 
   IHistoryParser = interface
