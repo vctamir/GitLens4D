@@ -75,6 +75,7 @@ implementation
 uses
   System.Classes,
   System.SysUtils,
+  System.IOUtils,
   Vcl.Dialogs,
   GitLens4D.Git.PathResolver,
   GitLens4D.Git.Runner,

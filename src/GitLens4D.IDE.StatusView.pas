@@ -4,7 +4,7 @@
   GitLens4D - Janela de Status (View)
   Princípio: Single Responsibility (SRP)
 
-  Esta unidade contém o formulário que será exibido como uma Tool Window
+  Esta unidade contém o frame que será exibido como uma Tool Window
   no Delphi IDE. Ela é responsável apenas pela exibição e interação visual.
   ============================================================================ }
 
@@ -33,7 +33,7 @@ uses
   Vcl.ImgList;
 
 type
-  TGitStatusView = class(TForm)
+  TGitStatusView = class(TFrame)
     lstFiles: TListView;
     pmStatus: TPopupMenu;
     popDiff: TMenuItem;
@@ -59,8 +59,8 @@ type
     ImageList1: TImageList;
     lblBranch: TLabel;
     btnPR: TButton;
-    chkSelectAll: TCheckBox;
     Splitter1: TSplitter;
+    chkSelectAll: TCheckBox;
     procedure popRefreshClick(Sender: TObject);
     procedure popDiffClick(Sender: TObject);
     procedure btnSuggestClick(Sender: TObject);
@@ -81,10 +81,6 @@ type
     FAIService : IAIService;
     FProjectDir: string;
     FRepoRoot  : string;
-
-    procedure ApplyTheme;
-    procedure RefreshStatus;
-    procedure RefreshBranches;
     procedure CheckUnsavedFiles;
     procedure CheckPendingChanges;
     function GetStatusIcon(AKind: TGitStatusKind): Integer;
@@ -94,13 +90,22 @@ type
     function GetRelativeFile(AItem: TListItem): string;
     procedure UpdateCommitMsg(const AText: string);
     procedure EnableSuggest(AEnabled: Boolean);
-  protected
-    procedure DoShow; override;
   public
+    constructor Create(AOwner: TComponent); overload; override;
     constructor Create(AOwner: TComponent; AProvider: IGitStatusProvider; ARunner: IGitRunner;
-      ASettings: ISettingsRepository; AAIService: IAIService; const AProjectDir: string); reintroduce;
+      ASettings: ISettingsRepository; AAIService: IAIService; const AProjectDir: string); reintroduce; overload;
     destructor Destroy; override;
+
+    procedure RefreshStatus;
+    procedure RefreshBranches;
     procedure UpdateList(const AFiles: TGitFileStatusArray);
+
+    property Provider: IGitStatusProvider read FProvider write FProvider;
+    property Runner: IGitRunner read FRunner write FRunner;
+    property Settings: ISettingsRepository read FSettings write FSettings;
+    property AIService: IAIService read FAIService write FAIService;
+    property ProjectDir: string read FProjectDir write FProjectDir;
+    property RepoRoot: string read FRepoRoot write FRepoRoot;
   end;
 
 var
@@ -134,47 +139,20 @@ begin
     FRepoRoot := StringReplace(FRepoRoot, '/', '\', [rfReplaceAll]);
   end;
 
-  Self.PopupMode  := pmAuto;
-  Self.KeyPreview := True;
-
   LoadSettings;
   RefreshStatus;
   RefreshBranches;
+end;
+
+constructor TGitStatusView.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
 end;
 
 destructor TGitStatusView.Destroy;
 begin
   SaveSettings;
   inherited;
-end;
-
-procedure TGitStatusView.DoShow;
-begin
-  inherited;
-  ApplyTheme;
-  RefreshStatus;
-  RefreshBranches;
-end;
-
-procedure TGitStatusView.ApplyTheme;
-var
-  LThemingSvc: IOTAIDEThemingServices;
-begin
-  if Supports(BorlandIDEServices, IOTAIDEThemingServices, LThemingSvc) then
-  begin
-    if LThemingSvc.IDEThemingEnabled then
-    begin
-      LThemingSvc.ApplyTheme(Self);
-      pnlCommit.ParentBackground     := False;
-      pnlCommit.Color                := Self.Color;
-      pnlTopMessage.ParentBackground := False;
-      pnlTopMessage.Color            := Self.Color;
-      Panel1.ParentBackground        := False;
-      Panel1.Color                   := Self.Color;
-      pnlBranch.ParentBackground     := False;
-      pnlBranch.Color                := Self.Color;
-    end;
-  end;
 end;
 
 procedure TGitStatusView.CheckUnsavedFiles;
@@ -227,7 +205,7 @@ var
   Current   : string;
   AheadCount: Integer;
 begin
-  if not Assigned(FRunner) then
+  if not Assigned(FRunner) or (FProjectDir = '') then
     Exit;
 
   BranchList := FRunner.GetBranches(FProjectDir);

@@ -1,4 +1,4 @@
-unit GitLens4D.Settings;
+﻿unit GitLens4D.Settings;
 
 { ============================================================================
   GitLens4D - Repositório de Configurações (Registro)
@@ -19,7 +19,8 @@ uses
 type
   TGitLensSettings = class(TInterfacedObject, ISettingsRepository)
   private
-    const REG_KEY = '\Software\QSGitLens4D';
+    const
+    REG_KEY = '\Software\QSGitLens4D';
   public
     procedure Load(out AEnabledEditor, AEnabledDebug: Boolean);
     procedure Save(AEnabledEditor, AEnabledDebug: Boolean);
@@ -45,7 +46,7 @@ var
 begin
   AEnabledEditor := True;
   AEnabledDebug  := False;
-  Reg := TRegistry.Create;
+  Reg            := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKey(REG_KEY, False) then
@@ -83,7 +84,7 @@ var
 begin
   ATaskNum  := '';
   ATaskDesc := '';
-  Reg := TRegistry.Create;
+  Reg       := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKey(REG_KEY, False) then
@@ -120,7 +121,7 @@ var
   Reg: TRegistry;
 begin
   ADraft := '';
-  Reg := TRegistry.Create;
+  Reg    := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKey(REG_KEY, False) then
@@ -152,7 +153,7 @@ var
   Reg: TRegistry;
 begin
   AFiles := '';
-  Reg := TRegistry.Create;
+  Reg    := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKey(REG_KEY, False) then
@@ -196,13 +197,20 @@ begin
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKey(REG_KEY, False) then
     begin
-      if Reg.ValueExists('AIType') then AType := Reg.ReadString('AIType');
-      if Reg.ValueExists('AIEndpoint') then AEndpoint := Reg.ReadString('AIEndpoint');
-      if Reg.ValueExists('AIKey') then AKey := Reg.ReadString('AIKey');
-      if Reg.ValueExists('AIModel') then AModel := Reg.ReadString('AIModel');
-      if Reg.ValueExists('AILang') then ALang := Reg.ReadString('AILang');
-      if Reg.ValueExists('AITemp') then ATemp := Reg.ReadFloat('AITemp');
-      if Reg.ValueExists('AIMaxTokens') then AMaxTokens := Reg.ReadInteger('AIMaxTokens');
+      if Reg.ValueExists('AIType') then
+        AType := Reg.ReadString('AIType');
+      if Reg.ValueExists('AIEndpoint') then
+        AEndpoint := Reg.ReadString('AIEndpoint');
+      if Reg.ValueExists('AIKey') then
+        AKey := Reg.ReadString('AIKey');
+      if Reg.ValueExists('AIModel') then
+        AModel := Reg.ReadString('AIModel');
+      if Reg.ValueExists('AILang') then
+        ALang := Reg.ReadString('AILang');
+      if Reg.ValueExists('AITemp') then
+        ATemp := Reg.ReadFloat('AITemp');
+      if Reg.ValueExists('AIMaxTokens') then
+        AMaxTokens := Reg.ReadInteger('AIMaxTokens');
     end;
   finally
     Reg.Free;
@@ -236,7 +244,7 @@ var
   Reg: TRegistry;
 begin
   AShortcutHist    := 'Ctrl+Shift+H';
-  AShortcutChanges := 'Ctrl+Alt+G';
+  AShortcutChanges := 'Ctrl+Shift+Alt+G';
   ACommitTag       := '';
 
   Reg := TRegistry.Create;
@@ -244,9 +252,12 @@ begin
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKey(REG_KEY, False) then
     begin
-      if Reg.ValueExists('ShortcutHist') then AShortcutHist := Reg.ReadString('ShortcutHist');
-      if Reg.ValueExists('ShortcutChanges') then AShortcutChanges := Reg.ReadString('ShortcutChanges');
-      if Reg.ValueExists('CommitExtraTag') then ACommitTag := Reg.ReadString('CommitExtraTag');
+      if Reg.ValueExists('ShortcutHist') then
+        AShortcutHist := Reg.ReadString('ShortcutHist');
+      if Reg.ValueExists('ShortcutChanges') then
+        AShortcutChanges := Reg.ReadString('ShortcutChanges');
+      if Reg.ValueExists('CommitExtraTag') then
+        ACommitTag := Reg.ReadString('CommitExtraTag');
     end;
   finally
     Reg.Free;

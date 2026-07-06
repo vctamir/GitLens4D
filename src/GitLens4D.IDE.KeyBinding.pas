@@ -40,7 +40,8 @@ type
 implementation
 
 uses
-  Vcl.Menus;
+  Vcl.Menus,
+  System.SysUtils;
 
 { TGitLensKeyboardBinding }
 
