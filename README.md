@@ -92,6 +92,6 @@ src/
 
 ## 📄 Licença
 
-Este projeto é software livre, open-source e está licenciado sob os termos da **MIT License**. Sinta-se livre para clonar, modificar e distribuir.
+Este projeto é software livre licenciado sob os termos da **GNU General Public License v3.0 (GPL-3.0)** — veja o arquivo [LICENSE](LICENSE). Você pode clonar, usar e modificar o código, mas qualquer versão modificada ou derivada distribuída deve permanecer open-source, sob a mesma licença.
 
 Criado com ☕ e Delphi por [vctamir](https://github.com/vctamir).
