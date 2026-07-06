@@ -95,28 +95,30 @@ begin
     'VERSÃO: ' + AProjVer + sLineBreak +
     'IDIOMA OBRIGATÓRIO: ' + LLang + sLineBreak +
     sLineBreak +
-    'REGRAS DE OURO:' + sLineBreak +
-    '1. Responda APENAS o texto do commit e o resumo técnico.' + sLineBreak +
+    'REGRAS DE OURO (cumprimento obrigatório, sem exceção):' + sLineBreak +
+    '1. Responda APENAS o texto do commit e o resumo técnico. Nenhum texto antes ou depois.' + sLineBreak +
     '2. PROIBIDO qualquer introdução, explicação ou Markdown de bloco (```).' + sLineBreak +
-    '3. OBRIGATÓRIO Substitua [tipo] por EXATAMENTE um dos seguintes: [FEAT|FIX|DOCS|REFACTOR|STYLE|TEST|PERF|CHORE].';
+    '3. O campo [TIPO] deve ser substituído por EXATAMENTE um destes valores, sempre em maiúsculas: FEAT, FIX, DOCS, REFACTOR, STYLE, TEST, PERF, CHORE. Escolha o tipo SOMENTE com base no conteúdo do Diff, nunca com base na descrição da task.' + sLineBreak +
+    '4. O número da task e a descrição da task fornecidos em "DADOS PARA GERAÇÃO" são fixos: copie-os EXATAMENTE como estão. PROIBIDO inventar, alterar, traduzir, resumir ou trocar a ordem desses dois valores.';
 
   if LExtraTag <> '' then
-    LSystem := LSystem + sLineBreak + '4. OBRIGATÓRIO: Inclua a tag ' + LExtraTag ;
+    LSystem := LSystem + sLineBreak + '5. OBRIGATÓRIO: Inclua a tag ' + LExtraTag;
 
-  LSystem := LSystem + sLineBreak + 'Exemplo de resposta:' + sLineBreak;
+  LSystem := LSystem + sLineBreak + sLineBreak +
+    'Exemplo de FORMATO (é apenas a estrutura; NUNCA copie estes valores de exemplo):' + sLineBreak;
   if LExtraTag <> '' then
     LSystem := LSystem + LExtraTag + sLineBreak;
 
-  LSystem := LSystem + '[tipo]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit ';
+  LSystem := LSystem + '## [TIPO]:[#000 - Descrição de exemplo da task] - Resumo geral do commit';
 
-  LUser := 'DADOS PARA GERAÇÃO:' + sLineBreak +
+  LUser := 'DADOS PARA GERAÇÃO (use estes valores exatamente, não invente outros):' + sLineBreak +
     '- Task Number: ' + ATaskNum + sLineBreak +
     '- Task Description: ' + ATaskDesc + sLineBreak +
     '- Diff: ' + ADiff + sLineBreak + sLineBreak +
-    'ESTRUTURA OBRIGATÓRIA DA RESPOSTA:' + sLineBreak;
+    'ESTRUTURA OBRIGATÓRIA DA RESPOSTA (substitua apenas [TIPO]; mantenha #' + ATaskNum + ' - ' + ATaskDesc + ' EXATAMENTE como informado acima):' + sLineBreak;
   if LExtraTag <> '' then
     LUser := LUser + LExtraTag + sLineBreak;
-  LUser := LUser + '## [tipo]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
+  LUser := LUser + '## [TIPO]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
     '### [VERSAO] ' + AProjName + ' v. ' + AProjVer + sLineBreak +
     sLineBreak +
     '### Detalhamento por arquivo' + sLineBreak +
