@@ -200,6 +200,11 @@ begin
       LFrame.RepoRoot := StringReplace(LFrame.RepoRoot, '/', '\', [rfReplaceAll]);
     end;
 
+    // Restaura task, rascunho de commit e formato salvos. Sem isto, ao
+    // reabrir o painel (frame recriado pela IDE) os campos vinham vazios,
+    // pois este caminho não passa pelo construtor que chama LoadSettings.
+    LFrame.LoadSettings;
+
     LFrame.RefreshStatus;
     LFrame.RefreshBranches;
   except

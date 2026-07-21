@@ -225,6 +225,27 @@ object GitStatusView: TGitStatusView
       DesignSize = (
         530
         44)
+      object lblFormat: TLabel
+        Left = 8
+        Top = 15
+        Width = 43
+        Height = 13
+        Caption = 'Formato:'
+      end
+      object cbFormat: TComboBox
+        Left = 57
+        Top = 11
+        Width = 120
+        Height = 21
+        Style = csDropDownList
+        ItemIndex = 0
+        TabOrder = 2
+        Text = 'Markdown'
+        OnChange = cbFormatChange
+        Items.Strings = (
+          'Markdown'
+          'Texto Puro')
+      end
       object btnSuggest: TButton
         Left = 280
         Top = 6

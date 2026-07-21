@@ -249,6 +249,26 @@ object GitSettingsView: TGitSettingsView
           'pt-BR'
           'en-US')
       end
+      object lblFormat: TLabel
+        Left = 220
+        Top = 244
+        Width = 44
+        Height = 13
+        Caption = 'Formato:'
+      end
+      object cbFormat: TComboBox
+        Left = 290
+        Top = 241
+        Width = 120
+        Height = 21
+        Style = csDropDownList
+        ItemIndex = 0
+        TabOrder = 7
+        Text = 'Markdown'
+        Items.Strings = (
+          'Markdown'
+          'Texto Puro')
+      end
     end
   end
 end

@@ -44,14 +44,14 @@ end;
 
 function TAIService.IsConfigured: Boolean;
 var
-  LType, LEndpoint, LKey, LModel, LLang: string;
-  LTemp                                : Double;
-  LMaxTokens                           : Integer;
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
 begin
   Result := False;
   if Assigned(FSettings) then
   begin
-    FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
+    FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
     Result := LEndpoint.Trim <> '';
   end;
 end;
@@ -70,24 +70,42 @@ end;
 
 function TAIService.GenerateCommitMessage(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
 var
-  LType, LEndpoint, LKey, LModel, LLang: string;
-  LTemp                                : Double;
-  LMaxTokens                           : Integer;
-  LSystem, LUser                       : string;
-  LResponse                            : string;
-  LSHist, LSChanges, LExtraTag         : string;
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
+  LSystem, LUser                                : string;
+  LResponse                                     : string;
+  LSHist, LSChanges, LExtraTag                  : string;
+  LMarkdown                                     : Boolean;
+  LFormatRule, LH2, LH3, LBullet                : string;
 begin
   Result := '';
   if not Assigned(FSettings) then
     Exit;
 
-  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
   FSettings.LoadGeneralConfig(LSHist, LSChanges, LExtraTag);
 
   if LEndpoint.Trim = '' then
   begin
     Result := 'Erro: Endpoint da IA não configurado.';
     Exit;
+  end;
+
+  LMarkdown := not SameText(LFormat, 'Texto Puro');
+  if LMarkdown then
+  begin
+    LFormatRule := '2. PROIBIDO qualquer introdução, explicação ou Markdown de bloco (```).';
+    LH2         := '## ';
+    LH3         := '### ';
+    LBullet     := '* **nome_arquivo.pas**: ';
+  end
+  else
+  begin
+    LFormatRule := '2. PROIBIDO qualquer introdução ou explicação. PROIBIDO qualquer formatação Markdown (#, *, **, ```): a resposta deve ser TEXTO PURO.';
+    LH2         := '';
+    LH3         := '';
+    LBullet     := '- nome_arquivo.pas: ';
   end;
 
   LSystem := 'Você é uma ferramenta técnica de automação Git.' + sLineBreak +
@@ -97,7 +115,7 @@ begin
     sLineBreak +
     'REGRAS DE OURO (cumprimento obrigatório, sem exceção):' + sLineBreak +
     '1. Responda APENAS o texto do commit e o resumo técnico. Nenhum texto antes ou depois.' + sLineBreak +
-    '2. PROIBIDO qualquer introdução, explicação ou Markdown de bloco (```).' + sLineBreak +
+    LFormatRule + sLineBreak +
     '3. O campo [TIPO] deve ser substituído por EXATAMENTE um destes valores, sempre em maiúsculas: FEAT, FIX, DOCS, REFACTOR, STYLE, TEST, PERF, CHORE. Escolha o tipo SOMENTE com base no conteúdo do Diff, nunca com base na descrição da task.' + sLineBreak +
     '4. O número da task e a descrição da task fornecidos em "DADOS PARA GERAÇÃO" são fixos: copie-os EXATAMENTE como estão. PROIBIDO inventar, alterar, traduzir, resumir ou trocar a ordem desses dois valores.';
 
@@ -109,7 +127,7 @@ begin
   if LExtraTag <> '' then
     LSystem := LSystem + LExtraTag + sLineBreak;
 
-  LSystem := LSystem + '## [TIPO]:[#000 - Descrição de exemplo da task] - Resumo geral do commit';
+  LSystem := LSystem + LH2 + '[TIPO]:[#000 - Descrição de exemplo da task] - Resumo geral do commit';
 
   LUser := 'DADOS PARA GERAÇÃO (use estes valores exatamente, não invente outros):' + sLineBreak +
     '- Task Number: ' + ATaskNum + sLineBreak +
@@ -118,11 +136,11 @@ begin
     'ESTRUTURA OBRIGATÓRIA DA RESPOSTA (substitua apenas [TIPO]; mantenha #' + ATaskNum + ' - ' + ATaskDesc + ' EXATAMENTE como informado acima):' + sLineBreak;
   if LExtraTag <> '' then
     LUser := LUser + LExtraTag + sLineBreak;
-  LUser   := LUser + '## [TIPO]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
-    '### [VERSAO] ' + AProjName + ' v. ' + AProjVer + sLineBreak +
+  LUser   := LUser + LH2 + '[TIPO]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
+    LH3 + '[VERSAO] ' + AProjName + ' v. ' + AProjVer + sLineBreak +
     sLineBreak +
-    '### Detalhamento por arquivo' + sLineBreak +
-    '* **nome_arquivo.pas**: breve descrição em ' + LLang + sLineBreak +
+    LH3 + 'Detalhamento por arquivo' + sLineBreak +
+    LBullet + 'breve descrição em ' + LLang + sLineBreak +
     sLineBreak +
     'Gere a resposta agora:';
 
@@ -141,43 +159,70 @@ end;
 
 function TAIService.GeneratePRDescription(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
 var
-  LType, LEndpoint, LKey, LModel, LLang: string;
-  LTemp                                : Double;
-  LMaxTokens                           : Integer;
-  LSystem, LUser                       : string;
-  LResponse                            : string;
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
+  LSystem, LUser                                : string;
+  LResponse                                     : string;
+  LMarkdown                                     : Boolean;
 begin
   Result := '';
   if not Assigned(FSettings) then
     Exit;
-  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
+
+  LMarkdown := not SameText(LFormat, 'Texto Puro');
 
   LSystem := 'Você é um Engenheiro de Software Senior especializado em Pull Requests.' + sLineBreak +
     'IDIOMA: ' + LLang + sLineBreak +
     'OBJETIVO: Gerar uma descrição de PR profissional seguindo os padrões do GitHub.' + sLineBreak +
-    'REGRAS:' + sLineBreak +
-    '1. Use Markdown completo.' + sLineBreak +
-    '2. Inclua uma seção de checklist com - [x] para o que foi feito e - [ ] para pendências.' + sLineBreak +
-    '3. Seja técnico e conciso.' + sLineBreak +
-    '4. NÃO use blocos de código (```) na resposta principal.';
+    'REGRAS:' + sLineBreak;
+
+  if LMarkdown then
+    LSystem := LSystem +
+      '1. Use Markdown completo.' + sLineBreak +
+      '2. Inclua uma seção de checklist com - [x] para o que foi feito e - [ ] para pendências.' + sLineBreak +
+      '3. Seja técnico e conciso.' + sLineBreak +
+      '4. NÃO use blocos de código (```) na resposta principal.'
+  else
+    LSystem := LSystem +
+      '1. PROIBIDO usar qualquer formatação Markdown (#, *, **, ```): a resposta deve ser TEXTO PURO.' + sLineBreak +
+      '2. Inclua uma seção de checklist com [x] para o que foi feito e [ ] para pendências.' + sLineBreak +
+      '3. Seja técnico e conciso.';
 
   LUser := 'CONTEXTO DO PR:' + sLineBreak +
     '- Projeto: ' + AProjName + sLineBreak +
     '- Versão: ' + AProjVer + sLineBreak +
     '- Task: #' + ATaskNum + ' - ' + ATaskDesc + sLineBreak +
     '- Diff das mudanças: ' + ADiff + sLineBreak + sLineBreak +
-    'ESTRUTURA SUGERIDA:' + sLineBreak +
-    '# PR: [Título Sugerido]' + sLineBreak +
-    '## 📝 Descrição' + sLineBreak +
-    '[Breve resumo do que este PR resolve]' + sLineBreak +
-    '## 🛠 Alterações Realizadas' + sLineBreak +
-    '[Lista de mudanças técnicas]' + sLineBreak +
-    '## ✅ Checklist' + sLineBreak +
-    '- [x] Implementação concluída' + sLineBreak +
-    '- [x] Testes realizados' + sLineBreak +
-    '- [ ] Documentação atualizada' + sLineBreak +
-    sLineBreak +
-    'Gere a descrição do PR agora:';
+    'ESTRUTURA SUGERIDA:' + sLineBreak;
+
+  if LMarkdown then
+    LUser := LUser +
+      '# PR: [Título Sugerido]' + sLineBreak +
+      '## 📝 Descrição' + sLineBreak +
+      '[Breve resumo do que este PR resolve]' + sLineBreak +
+      '## 🛠 Alterações Realizadas' + sLineBreak +
+      '[Lista de mudanças técnicas]' + sLineBreak +
+      '## ✅ Checklist' + sLineBreak +
+      '- [x] Implementação concluída' + sLineBreak +
+      '- [x] Testes realizados' + sLineBreak +
+      '- [ ] Documentação atualizada' + sLineBreak +
+      sLineBreak +
+      'Gere a descrição do PR agora:'
+  else
+    LUser := LUser +
+      'PR: [Título Sugerido]' + sLineBreak +
+      'DESCRIÇÃO' + sLineBreak +
+      '[Breve resumo do que este PR resolve]' + sLineBreak +
+      'ALTERAÇÕES REALIZADAS' + sLineBreak +
+      '[Lista de mudanças técnicas]' + sLineBreak +
+      'CHECKLIST' + sLineBreak +
+      '[x] Implementação concluída' + sLineBreak +
+      '[x] Testes realizados' + sLineBreak +
+      '[ ] Documentação atualizada' + sLineBreak +
+      sLineBreak +
+      'Gere a descrição do PR agora:';
 
   try
     if SameText(LType, 'Local') and LEndpoint.Contains('11434') then

@@ -26,6 +26,7 @@ uses
   Vcl.Menus,
   Vcl.StdCtrls,
   Vcl.Clipbrd,
+  Vcl.AppEvnts,
   GitLens4D.Interfaces,
   ToolsAPI,
   System.IOUtils,
@@ -61,6 +62,9 @@ type
     btnPR: TButton;
     Splitter1: TSplitter;
     chkSelectAll: TCheckBox;
+    lblFormat: TLabel;
+    cbFormat: TComboBox;
+    procedure cbFormatChange(Sender: TObject);
     procedure popRefreshClick(Sender: TObject);
     procedure popDiffClick(Sender: TObject);
     procedure btnSuggestClick(Sender: TObject);
@@ -81,11 +85,15 @@ type
     FAIService : IAIService;
     FProjectDir: string;
     FRepoRoot  : string;
+    FAppEvents : TApplicationEvents;
+    procedure InitClipboardHook;
+    procedure HandleAppMessage(var Msg: TMsg; var Handled: Boolean);
     procedure CheckUnsavedFiles;
     procedure CheckPendingChanges;
     function GetStatusIcon(AKind: TGitStatusKind): Integer;
-    procedure LoadSettings;
     procedure SaveSettings;
+    procedure PersistSelectedFormat;
+    function GetProjectKey: string;
     function GetSelectedRelativeFile: string;
     function GetRelativeFile(AItem: TListItem): string;
     procedure UpdateCommitMsg(const AText: string);
@@ -98,6 +106,7 @@ type
 
     procedure RefreshStatus;
     procedure RefreshBranches;
+    procedure LoadSettings;
     procedure UpdateList(const AFiles: TGitFileStatusArray);
 
     property Provider: IGitStatusProvider read FProvider write FProvider;
@@ -139,6 +148,7 @@ begin
     FRepoRoot := StringReplace(FRepoRoot, '/', '\', [rfReplaceAll]);
   end;
 
+  InitClipboardHook;
   LoadSettings;
   RefreshStatus;
   RefreshBranches;
@@ -147,6 +157,44 @@ end;
 constructor TGitStatusView.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  InitClipboardHook;
+end;
+
+procedure TGitStatusView.InitClipboardHook;
+begin
+  // A IDE intercepta Ctrl+V/C/X/A/Z (atalhos do menu Edit) antes que a
+  // mensagem chegue aos controles de janelas dockadas; por isso os edits
+  // de task não aceitavam colar. Capturamos a tecla no loop de mensagens
+  // e aplicamos a ação diretamente no edit focado deste frame.
+  FAppEvents           := TApplicationEvents.Create(Self);
+  FAppEvents.OnMessage := HandleAppMessage;
+end;
+
+procedure TGitStatusView.HandleAppMessage(var Msg: TMsg; var Handled: Boolean);
+var
+  LCtrl: TWinControl;
+  LEdit: TCustomEdit;
+begin
+  if Msg.message <> WM_KEYDOWN then
+    Exit;
+  if (GetKeyState(VK_CONTROL) >= 0) or (GetKeyState(VK_MENU) < 0) then
+    Exit;
+
+  LCtrl := FindControl(Msg.hwnd);
+  if not (LCtrl is TCustomEdit) or not ContainsControl(LCtrl) then
+    Exit;
+
+  LEdit   := TCustomEdit(LCtrl);
+  Handled := True;
+  case Msg.wParam of
+    Ord('V'): LEdit.PasteFromClipboard;
+    Ord('C'): LEdit.CopyToClipboard;
+    Ord('X'): LEdit.CutToClipboard;
+    Ord('A'): LEdit.SelectAll;
+    Ord('Z'): LEdit.Undo;
+  else
+    Handled := False;
+  end;
 end;
 
 destructor TGitStatusView.Destroy;
@@ -316,8 +364,12 @@ end;
 
 procedure TGitStatusView.LoadSettings;
 var
-  LTaskNum, LTaskDesc: string;
-  LDraft             : string;
+  LTaskNum, LTaskDesc                           : string;
+  LDraft                                        : string;
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LProjFormat                                   : string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
 begin
   if Assigned(FSettings) then
   begin
@@ -328,7 +380,54 @@ begin
     FSettings.LoadCommitDraft(LDraft);
     if LDraft <> '' then
       memCommitMsg.Text := LDraft;
+
+    // Seletor de formato: a preferência do projeto atual tem prioridade
+    // sobre a configuração global da IA.
+    FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
+    FSettings.LoadProjectFormat(GetProjectKey, LProjFormat);
+    if LProjFormat <> '' then
+      LFormat := LProjFormat;
+
+    cbFormat.ItemIndex := cbFormat.Items.IndexOf(LFormat);
+    if cbFormat.ItemIndex = -1 then
+      cbFormat.ItemIndex := 0;
+
+    // Alinha a config global (lida pelo AIService) com o formato do projeto.
+    PersistSelectedFormat;
   end;
+end;
+
+function TGitStatusView.GetProjectKey: string;
+begin
+  if FRepoRoot <> '' then
+    Result := LowerCase(FRepoRoot)
+  else
+    Result := LowerCase(FProjectDir);
+end;
+
+procedure TGitStatusView.PersistSelectedFormat;
+var
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
+  LSelected                                     : string;
+begin
+  if not Assigned(FSettings) or (cbFormat.ItemIndex = -1) then
+    Exit;
+
+  LSelected := cbFormat.Items[cbFormat.ItemIndex];
+
+  // 1. Config global da IA (é a fonte lida pelo AIService ao gerar).
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
+  FSettings.SaveAIConfig(LType, LEndpoint, LKey, LModel, LLang, LSelected, LTemp, LMaxTokens);
+
+  // 2. Preferência por projeto (restaurada ao reabrir este repositório).
+  FSettings.SaveProjectFormat(GetProjectKey, LSelected);
+end;
+
+procedure TGitStatusView.cbFormatChange(Sender: TObject);
+begin
+  PersistSelectedFormat;
 end;
 
 procedure TGitStatusView.SaveSettings;
@@ -458,6 +557,7 @@ var
   LMetadata          : TGitProjectMetadata;
 begin
   SaveSettings;
+  PersistSelectedFormat; // garante que a IA use o formato selecionado na tela
   if not Assigned(FAIService) then
   begin
     ShowMessage('AI Service not initialized.');

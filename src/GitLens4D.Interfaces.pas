@@ -105,8 +105,10 @@ type
     procedure SaveCommitDraft(const ADraft: string);
     procedure LoadSelectedFiles(out AFiles: string);
     procedure SaveSelectedFiles(const AFiles: string);
-    procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang: string; out ATemp: Double; out AMaxTokens: Integer);
-    procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang: string; ATemp: Double; AMaxTokens: Integer);
+    procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang, AFormat: string; out ATemp: Double; out AMaxTokens: Integer);
+    procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang, AFormat: string; ATemp: Double; AMaxTokens: Integer);
+    procedure LoadProjectFormat(const AProjectKey: string; out AFormat: string);
+    procedure SaveProjectFormat(const AProjectKey, AFormat: string);
     procedure LoadGeneralConfig(out AShortcutHist, AShortcutChanges, ACommitTag: string);
     procedure SaveGeneralConfig(const AShortcutHist, AShortcutChanges, ACommitTag: string);
   end;

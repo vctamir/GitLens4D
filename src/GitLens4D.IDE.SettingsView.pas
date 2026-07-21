@@ -49,6 +49,8 @@ type
     edtMaxTokens: TEdit;
     lblLang: TLabel;
     cbLang: TComboBox;
+    lblFormat: TLabel;
+    cbFormat: TComboBox;
     procedure btnSaveClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
   private
@@ -110,10 +112,10 @@ end;
 
 procedure TGitSettingsView.LoadConfigs;
 var
-  LHist, LChanges, LTag                : string;
-  LType, LEndpoint, LKey, LModel, LLang: string;
-  LTemp                                : Double;
-  LMaxTokens                           : Integer;
+  LHist, LChanges, LTag                         : string;
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
 begin
   if Assigned(FSettings) then
   begin
@@ -124,7 +126,7 @@ begin
     edtCommitTag.Text       := LTag;
 
     // IA
-    FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LTemp, LMaxTokens);
+    FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
     cbType.ItemIndex := cbType.Items.IndexOf(LType);
     if cbType.ItemIndex = -1 then
       cbType.ItemIndex := 0;
@@ -132,6 +134,10 @@ begin
     cbLang.ItemIndex := cbLang.Items.IndexOf(LLang);
     if cbLang.ItemIndex = -1 then
       cbLang.ItemIndex := 0;
+
+    cbFormat.ItemIndex := cbFormat.Items.IndexOf(LFormat);
+    if cbFormat.ItemIndex = -1 then
+      cbFormat.ItemIndex := 0;
 
     edtEndpoint.Text  := LEndpoint;
     edtKey.Text       := LKey;
@@ -143,7 +149,7 @@ end;
 
 procedure TGitSettingsView.btnSaveClick(Sender: TObject);
 var
-  LType, LLang: string;
+  LType, LLang, LFormat: string;
 begin
   if Assigned(FSettings) then
   begin
@@ -163,7 +169,11 @@ begin
     if cbLang.ItemIndex <> -1 then
       LLang := cbLang.Items[cbLang.ItemIndex];
 
-    FSettings.SaveAIConfig(LType, edtEndpoint.Text, edtKey.Text, edtModel.Text, LLang,
+    LFormat := 'Markdown';
+    if cbFormat.ItemIndex <> -1 then
+      LFormat := cbFormat.Items[cbFormat.ItemIndex];
+
+    FSettings.SaveAIConfig(LType, edtEndpoint.Text, edtKey.Text, edtModel.Text, LLang, LFormat,
       StrToFloatDef(edtTemp.Text, 0.7), StrToIntDef(edtMaxTokens.Text, 2048));
 
     ShowMessage(UTF8ToString('Configurações salvas! Reinicie o Delphi para aplicar os novos atalhos de teclado.'));

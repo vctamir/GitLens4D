@@ -30,8 +30,10 @@ type
     procedure SaveCommitDraft(const ADraft: string);
     procedure LoadSelectedFiles(out AFiles: string);
     procedure SaveSelectedFiles(const AFiles: string);
-    procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang: string; out ATemp: Double; out AMaxTokens: Integer);
-    procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang: string; ATemp: Double; AMaxTokens: Integer);
+    procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang, AFormat: string; out ATemp: Double; out AMaxTokens: Integer);
+    procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang, AFormat: string; ATemp: Double; AMaxTokens: Integer);
+    procedure LoadProjectFormat(const AProjectKey: string; out AFormat: string);
+    procedure SaveProjectFormat(const AProjectKey, AFormat: string);
     procedure LoadGeneralConfig(out AShortcutHist, AShortcutChanges, ACommitTag: string);
     procedure SaveGeneralConfig(const AShortcutHist, AShortcutChanges, ACommitTag: string);
   end;
@@ -180,7 +182,7 @@ begin
   end;
 end;
 
-procedure TGitLensSettings.LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang: string; out ATemp: Double; out AMaxTokens: Integer);
+procedure TGitLensSettings.LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang, AFormat: string; out ATemp: Double; out AMaxTokens: Integer);
 var
   Reg: TRegistry;
 begin
@@ -189,6 +191,7 @@ begin
   AKey       := '';
   AModel     := 'codellama';
   ALang      := 'pt-BR';
+  AFormat    := 'Markdown';
   ATemp      := 0.7;
   AMaxTokens := 2048;
 
@@ -207,6 +210,8 @@ begin
         AModel := Reg.ReadString('AIModel');
       if Reg.ValueExists('AILang') then
         ALang := Reg.ReadString('AILang');
+      if Reg.ValueExists('AIFormat') then
+        AFormat := Reg.ReadString('AIFormat');
       if Reg.ValueExists('AITemp') then
         ATemp := Reg.ReadFloat('AITemp');
       if Reg.ValueExists('AIMaxTokens') then
@@ -217,7 +222,7 @@ begin
   end;
 end;
 
-procedure TGitLensSettings.SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang: string; ATemp: Double; AMaxTokens: Integer);
+procedure TGitLensSettings.SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang, AFormat: string; ATemp: Double; AMaxTokens: Integer);
 var
   Reg: TRegistry;
 begin
@@ -231,9 +236,48 @@ begin
       Reg.WriteString('AIKey', AKey);
       Reg.WriteString('AIModel', AModel);
       Reg.WriteString('AILang', ALang);
+      Reg.WriteString('AIFormat', AFormat);
       Reg.WriteFloat('AITemp', ATemp);
       Reg.WriteInteger('AIMaxTokens', AMaxTokens);
     end;
+  finally
+    Reg.Free;
+  end;
+end;
+
+procedure TGitLensSettings.LoadProjectFormat(const AProjectKey: string; out AFormat: string);
+var
+  Reg: TRegistry;
+begin
+  AFormat := '';
+  if AProjectKey.Trim = '' then
+    Exit;
+
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey(REG_KEY + '\ProjectFormats', False) then
+    begin
+      if Reg.ValueExists(AProjectKey) then
+        AFormat := Reg.ReadString(AProjectKey);
+    end;
+  finally
+    Reg.Free;
+  end;
+end;
+
+procedure TGitLensSettings.SaveProjectFormat(const AProjectKey, AFormat: string);
+var
+  Reg: TRegistry;
+begin
+  if AProjectKey.Trim = '' then
+    Exit;
+
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey(REG_KEY + '\ProjectFormats', True) then
+      Reg.WriteString(AProjectKey, AFormat);
   finally
     Reg.Free;
   end;
