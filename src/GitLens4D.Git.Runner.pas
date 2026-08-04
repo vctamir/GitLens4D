@@ -32,6 +32,9 @@ type
     procedure DiscardChanges(const AFile, ABaseDir: string);
     function GetRemoteUrl(const ABaseDir: string): string;
     function GetAheadCount(const ABaseDir: string): Integer;
+    procedure ResetStage(const ABaseDir: string);
+    function HasStagedChanges(const ABaseDir: string): Boolean;
+    function Commit(const AMessage, ABaseDir: string; out AOutput: string): Boolean;
   end;
 
 implementation
@@ -39,6 +42,7 @@ implementation
 uses
   Winapi.Windows,
   System.SysUtils,
+  System.IOUtils,
   GitLens4D.Git.PathResolver;
 
 function TGitRunner.GetCurrentBranch(const ABaseDir: string): string;
@@ -157,6 +161,60 @@ begin
 
   if LOutput <> '' then
     Result := StrToIntDef(LOutput, 0);
+end;
+
+procedure TGitRunner.ResetStage(const ABaseDir: string);
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  Command := Format('"%s" reset', [PathSvc.Resolve]);
+  Execute(Command, ABaseDir);
+end;
+
+function TGitRunner.HasStagedChanges(const ABaseDir: string): Boolean;
+var
+  Command: string;
+  PathSvc: IGitPathResolver;
+begin
+  PathSvc := TGitPathResolver.Create;
+  // lista somente os nomes dos arquivos no stage; vazio = nada a comitar
+  Command := Format('"%s" diff --cached --name-only', [PathSvc.Resolve]);
+  Result  := Execute(Command, ABaseDir).Trim <> '';
+end;
+
+function TGitRunner.Commit(const AMessage, ABaseDir: string; out AOutput: string): Boolean;
+var
+  Command : string;
+  PathSvc : IGitPathResolver;
+  LMsgFile: string;
+begin
+  AOutput := '';
+  PathSvc := TGitPathResolver.Create;
+
+  // A mensagem vai por arquivo (-F) em vez de -m "texto": assim aspas,
+  // quebras de linha, % e acentos passam intactos, sem depender do
+  // escape do cmd.exe.
+  LMsgFile := TPath.Combine(TPath.GetTempPath,
+    'gitlens4d_commit_' + FormatDateTime('yyyymmddhhnnsszzz', Now) + '.txt');
+  try
+    // UTF-8 sem BOM: o git le a mensagem nesse encoding por padrao.
+    TFile.WriteAllText(LMsgFile, AMessage, TEncoding.UTF8);
+
+    Command := Format('"%s" commit --file="%s"', [PathSvc.Resolve, LMsgFile]);
+    AOutput := Execute(Command, ABaseDir);
+
+    // Nao da para confiar em procurar "error"/"fatal" na saida: quando nao ha
+    // nada no stage o git responde "nothing to commit" e quando o git nao esta
+    // no PATH o cmd responde "nao e reconhecido" -- nenhum dos dois casa.
+    // O criterio confiavel e o HEAD ter avancado, entao conferimos se ainda
+    // restou algo no stage.
+    Result := not HasStagedChanges(ABaseDir);
+  finally
+    if TFile.Exists(LMsgFile) then
+      TFile.Delete(LMsgFile);
+  end;
 end;
 
 function TGitRunner.GetRepoRoot(const ABaseDir: string): string;

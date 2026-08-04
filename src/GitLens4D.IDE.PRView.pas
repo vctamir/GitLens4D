@@ -30,9 +30,12 @@ type
     btnClose: TButton;
     pnlTop: TPanel;
     lblTitle: TLabel;
+    lblFormat: TLabel;
+    cbFormat: TComboBox;
     procedure btnCloseClick(Sender: TObject);
     procedure btnSuggestClick(Sender: TObject);
     procedure btnCopyOpenClick(Sender: TObject);
+    procedure cbFormatChange(Sender: TObject);
   private
     FRunner    : IGitRunner;
     FAIService : IAIService;
@@ -45,6 +48,9 @@ type
 
     procedure ApplyTheme;
     procedure UpdatePRBody(const AText: string);
+    function GetProjectKey: string;
+    procedure LoadSelectedFormat;
+    procedure PersistSelectedFormat;
   protected
     procedure DoShow; override;
   public
@@ -97,6 +103,74 @@ procedure TGitPRView.DoShow;
 begin
   inherited;
   ApplyTheme;
+  LoadSelectedFormat;
+end;
+
+function TGitPRView.GetProjectKey: string;
+var
+  LRoot: string;
+begin
+  // Mesma chave usada pela tela de commit, para os dois compartilharem a
+  // preferencia de formato do repositorio. O git devolve o caminho com '/',
+  // e a tela de commit normaliza para '\' antes de montar a chave -- sem a
+  // mesma troca aqui as duas telas gravariam em chaves diferentes.
+  LRoot := '';
+  if Assigned(FRunner) then
+    LRoot := StringReplace(FRunner.GetRepoRoot(FProjectDir), '/', '\', [rfReplaceAll]);
+
+  if LRoot <> '' then
+    Result := LowerCase(LRoot)
+  else
+    Result := LowerCase(FProjectDir);
+end;
+
+procedure TGitPRView.LoadSelectedFormat;
+var
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
+  LProjFormat                                   : string;
+begin
+  if not Assigned(FSettings) then
+    Exit;
+
+  // A preferencia do projeto atual tem prioridade sobre a config global.
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
+  FSettings.LoadProjectFormat(GetProjectKey, LProjFormat);
+  if LProjFormat <> '' then
+    LFormat := LProjFormat;
+
+  cbFormat.ItemIndex := cbFormat.Items.IndexOf(LFormat);
+  if cbFormat.ItemIndex = -1 then
+    cbFormat.ItemIndex := 0;
+
+  // Alinha a config global (lida pelo AIService) com o formato do projeto.
+  PersistSelectedFormat;
+end;
+
+procedure TGitPRView.PersistSelectedFormat;
+var
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
+  LSelected                                     : string;
+begin
+  if not Assigned(FSettings) or (cbFormat.ItemIndex = -1) then
+    Exit;
+
+  LSelected := cbFormat.Items[cbFormat.ItemIndex];
+
+  // 1. Config global da IA (e a fonte lida pelo AIService ao gerar).
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
+  FSettings.SaveAIConfig(LType, LEndpoint, LKey, LModel, LLang, LSelected, LTemp, LMaxTokens);
+
+  // 2. Preferencia por projeto (restaurada ao reabrir este repositorio).
+  FSettings.SaveProjectFormat(GetProjectKey, LSelected);
+end;
+
+procedure TGitPRView.cbFormatChange(Sender: TObject);
+begin
+  PersistSelectedFormat;
 end;
 
 procedure TGitPRView.ApplyTheme;

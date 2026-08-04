@@ -21,15 +21,17 @@ type
   private
     const
     REG_KEY = '\Software\QSGitLens4D';
+    /// Chave onde ficam os dados de cada repositorio (um subkey por projeto).
+    function ProjectKeyPath(const AProjectKey: string): string;
   public
     procedure Load(out AEnabledEditor, AEnabledDebug: Boolean);
     procedure Save(AEnabledEditor, AEnabledDebug: Boolean);
-    procedure LoadTaskInfo(out ATaskNum, ATaskDesc: string);
-    procedure SaveTaskInfo(const ATaskNum, ATaskDesc: string);
-    procedure LoadCommitDraft(out ADraft: string);
-    procedure SaveCommitDraft(const ADraft: string);
-    procedure LoadSelectedFiles(out AFiles: string);
-    procedure SaveSelectedFiles(const AFiles: string);
+    procedure LoadTaskInfo(const AProjectKey: string; out ATaskNum, ATaskDesc: string);
+    procedure SaveTaskInfo(const AProjectKey, ATaskNum, ATaskDesc: string);
+    procedure LoadCommitDraft(const AProjectKey: string; out ADraft: string);
+    procedure SaveCommitDraft(const AProjectKey, ADraft: string);
+    procedure LoadSelectedFiles(const AProjectKey: string; out AFiles: string);
+    procedure SaveSelectedFiles(const AProjectKey, AFiles: string);
     procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang, AFormat: string; out ATemp: Double; out AMaxTokens: Integer);
     procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang, AFormat: string; ATemp: Double; AMaxTokens: Integer);
     procedure LoadProjectFormat(const AProjectKey: string; out AFormat: string);
@@ -80,7 +82,26 @@ begin
   end;
 end;
 
-procedure TGitLensSettings.LoadTaskInfo(out ATaskNum, ATaskDesc: string);
+function TGitLensSettings.ProjectKeyPath(const AProjectKey: string): string;
+var
+  LNome: string;
+  I    : Integer;
+begin
+  // O nome de uma chave do registro nao aceita '\', e a chave do projeto e um
+  // caminho (ex.: e:\tamir\gitlens4d). Troca os separadores por '_' para virar
+  // um nome valido e ainda legivel no regedit.
+  LNome := LowerCase(Trim(AProjectKey));
+  for I := 1 to Length(LNome) do
+    if CharInSet(LNome[I], ['\', '/', ':', '*', '?', '"', '<', '>', '|']) then
+      LNome[I] := '_';
+
+  if LNome = '' then
+    LNome := 'default';
+
+  Result := REG_KEY + '\Projects\' + LNome;
+end;
+
+procedure TGitLensSettings.LoadTaskInfo(const AProjectKey: string; out ATaskNum, ATaskDesc: string);
 var
   Reg: TRegistry;
 begin
@@ -89,7 +110,7 @@ begin
   Reg       := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
-    if Reg.OpenKey(REG_KEY, False) then
+    if Reg.OpenKey(ProjectKeyPath(AProjectKey), False) then
     begin
       if Reg.ValueExists('LastTaskNum') then
         ATaskNum := Reg.ReadString('LastTaskNum');
@@ -101,14 +122,14 @@ begin
   end;
 end;
 
-procedure TGitLensSettings.SaveTaskInfo(const ATaskNum, ATaskDesc: string);
+procedure TGitLensSettings.SaveTaskInfo(const AProjectKey, ATaskNum, ATaskDesc: string);
 var
   Reg: TRegistry;
 begin
   Reg := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
-    if Reg.OpenKey(REG_KEY, True) then
+    if Reg.OpenKey(ProjectKeyPath(AProjectKey), True) then
     begin
       Reg.WriteString('LastTaskNum', ATaskNum);
       Reg.WriteString('LastTaskDesc', ATaskDesc);
@@ -118,7 +139,7 @@ begin
   end;
 end;
 
-procedure TGitLensSettings.LoadCommitDraft(out ADraft: string);
+procedure TGitLensSettings.LoadCommitDraft(const AProjectKey: string; out ADraft: string);
 var
   Reg: TRegistry;
 begin
@@ -126,7 +147,7 @@ begin
   Reg    := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
-    if Reg.OpenKey(REG_KEY, False) then
+    if Reg.OpenKey(ProjectKeyPath(AProjectKey), False) then
     begin
       if Reg.ValueExists('CommitDraft') then
         ADraft := Reg.ReadString('CommitDraft');
@@ -136,21 +157,21 @@ begin
   end;
 end;
 
-procedure TGitLensSettings.SaveCommitDraft(const ADraft: string);
+procedure TGitLensSettings.SaveCommitDraft(const AProjectKey, ADraft: string);
 var
   Reg: TRegistry;
 begin
   Reg := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
-    if Reg.OpenKey(REG_KEY, True) then
+    if Reg.OpenKey(ProjectKeyPath(AProjectKey), True) then
       Reg.WriteString('CommitDraft', ADraft);
   finally
     Reg.Free;
   end;
 end;
 
-procedure TGitLensSettings.LoadSelectedFiles(out AFiles: string);
+procedure TGitLensSettings.LoadSelectedFiles(const AProjectKey: string; out AFiles: string);
 var
   Reg: TRegistry;
 begin
@@ -158,7 +179,7 @@ begin
   Reg    := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
-    if Reg.OpenKey(REG_KEY, False) then
+    if Reg.OpenKey(ProjectKeyPath(AProjectKey), False) then
     begin
       if Reg.ValueExists('SelectedFiles') then
         AFiles := Reg.ReadString('SelectedFiles');
@@ -168,14 +189,14 @@ begin
   end;
 end;
 
-procedure TGitLensSettings.SaveSelectedFiles(const AFiles: string);
+procedure TGitLensSettings.SaveSelectedFiles(const AProjectKey, AFiles: string);
 var
   Reg: TRegistry;
 begin
   Reg := TRegistry.Create;
   try
     Reg.RootKey := HKEY_CURRENT_USER;
-    if Reg.OpenKey(REG_KEY, True) then
+    if Reg.OpenKey(ProjectKeyPath(AProjectKey), True) then
       Reg.WriteString('SelectedFiles', AFiles);
   finally
     Reg.Free;

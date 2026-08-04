@@ -37,6 +37,9 @@ type
     procedure DiscardChanges(const AFile, ABaseDir: string);
     function GetRemoteUrl(const ABaseDir: string): string;
     function GetAheadCount(const ABaseDir: string): Integer;
+    procedure ResetStage(const ABaseDir: string);
+    function HasStagedChanges(const ABaseDir: string): Boolean;
+    function Commit(const AMessage, ABaseDir: string; out AOutput: string): Boolean;
   end;
 
   // ── Contrato: Interpretar saída do "git blame -p" ────────────────────────
@@ -99,12 +102,13 @@ type
     ['{E5F6A7B8-C9D0-4123-EF45-67890ABCDEF0}']
     procedure Load(out AEnabledEditor, AEnabledDebug: Boolean);
     procedure Save(AEnabledEditor, AEnabledDebug: Boolean);
-    procedure LoadTaskInfo(out ATaskNum, ATaskDesc: string);
-    procedure SaveTaskInfo(const ATaskNum, ATaskDesc: string);
-    procedure LoadCommitDraft(out ADraft: string);
-    procedure SaveCommitDraft(const ADraft: string);
-    procedure LoadSelectedFiles(out AFiles: string);
-    procedure SaveSelectedFiles(const AFiles: string);
+    // Rascunho, task e selecao sao por repositorio: cada projeto mantem o seu.
+    procedure LoadTaskInfo(const AProjectKey: string; out ATaskNum, ATaskDesc: string);
+    procedure SaveTaskInfo(const AProjectKey, ATaskNum, ATaskDesc: string);
+    procedure LoadCommitDraft(const AProjectKey: string; out ADraft: string);
+    procedure SaveCommitDraft(const AProjectKey, ADraft: string);
+    procedure LoadSelectedFiles(const AProjectKey: string; out AFiles: string);
+    procedure SaveSelectedFiles(const AProjectKey, AFiles: string);
     procedure LoadAIConfig(out AType, AEndpoint, AKey, AModel, ALang, AFormat: string; out ATemp: Double; out AMaxTokens: Integer);
     procedure SaveAIConfig(const AType, AEndpoint, AKey, AModel, ALang, AFormat: string; ATemp: Double; AMaxTokens: Integer);
     procedure LoadProjectFormat(const AProjectKey: string; out AFormat: string);

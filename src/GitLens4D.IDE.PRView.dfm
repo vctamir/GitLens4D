@@ -87,15 +87,38 @@ object GitPRView: TGitPRView
     object lblTitle: TLabel
       Left = 10
       Top = 13
-      Width = 345
+      Width = 274
       Height = 16
-      Caption = 'Elabore a descri'#231#227'o do seu Pull Request (Markdown):'
+      Caption = 'Elabore a descri'#231#227'o do seu Pull Request:'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -13
       Font.Name = 'Tahoma'
       Font.Style = [fsBold]
       ParentFont = False
+    end
+    object lblFormat: TLabel
+      Left = 348
+      Top = 15
+      Width = 43
+      Height = 13
+      Anchors = [akTop, akRight]
+      Caption = 'Formato:'
+    end
+    object cbFormat: TComboBox
+      Left = 397
+      Top = 11
+      Width = 120
+      Height = 21
+      Style = csDropDownList
+      Anchors = [akTop, akRight]
+      ItemIndex = 0
+      TabOrder = 0
+      Text = 'Markdown'
+      OnChange = cbFormatChange
+      Items.Strings = (
+        'Markdown'
+        'Texto Puro')
     end
   end
   object ImageList1: TImageList
@@ -105,7 +128,7 @@ object GitPRView: TGitPRView
     Left = 184
     Top = 152
     Bitmap = {
-      494C0101070008006C0018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C010107000800700018001800FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000600000003000000001002000000000000048
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000200000

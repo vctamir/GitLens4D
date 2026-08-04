@@ -373,13 +373,14 @@ var
 begin
   if Assigned(FSettings) then
   begin
-    FSettings.LoadTaskInfo(LTaskNum, LTaskDesc);
+    FSettings.LoadTaskInfo(GetProjectKey, LTaskNum, LTaskDesc);
     edtTaskNum.Text  := LTaskNum;
     edtTaskDesc.Text := LTaskDesc;
 
-    FSettings.LoadCommitDraft(LDraft);
-    if LDraft <> '' then
-      memCommitMsg.Text := LDraft;
+    // O rascunho e restaurado sempre (inclusive vazio): se viesse so quando
+    // preenchido, o texto do projeto anterior continuaria na tela.
+    FSettings.LoadCommitDraft(GetProjectKey, LDraft);
+    memCommitMsg.Text := LDraft;
 
     // Seletor de formato: a preferência do projeto atual tem prioridade
     // sobre a configuração global da IA.
@@ -437,8 +438,8 @@ var
 begin
   if Assigned(FSettings) then
   begin
-    FSettings.SaveTaskInfo(edtTaskNum.Text, edtTaskDesc.Text);
-    FSettings.SaveCommitDraft(memCommitMsg.Text);
+    FSettings.SaveTaskInfo(GetProjectKey, edtTaskNum.Text, edtTaskDesc.Text);
+    FSettings.SaveCommitDraft(GetProjectKey, memCommitMsg.Text);
 
     // Salva quais arquivos estão marcados
     LSelected := TStringList.Create;
@@ -448,7 +449,7 @@ begin
         if lstFiles.Items[I].Checked then
           LSelected.Add(GetRelativeFile(lstFiles.Items[I]));
       end;
-      FSettings.SaveSelectedFiles(LSelected.CommaText);
+      FSettings.SaveSelectedFiles(GetProjectKey, LSelected.CommaText);
     finally
       LSelected.Free;
     end;
@@ -457,15 +458,36 @@ end;
 
 procedure TGitStatusView.btnCommitClick(Sender: TObject);
 var
-  Msg     : string;
-  I       : Integer;
-  FilePath: string;
-  LOutput : string;
+  Msg      : string;
+  I        : Integer;
+  FilePath : string;
+  LOutput  : string;
+  LMarcados: Integer;
 begin
   CheckUnsavedFiles;
 
-  // 1. Limpa o stage atual (git reset) para garantir commit seletivo
-  FRunner.Execute('git reset', FProjectDir);
+  // A mensagem e validada antes de mexer no stage: assim uma mensagem vazia
+  // nao deixa o repositorio com o stage ja limpo pelo reset.
+  Msg := Trim(memCommitMsg.Text);
+  if Msg = '' then
+  begin
+    ShowMessage(UTF8ToString('Por favor, informe uma mensagem de commit.'));
+    Exit;
+  end;
+
+  LMarcados := 0;
+  for I := 0 to lstFiles.Items.Count - 1 do
+    if lstFiles.Items[I].Checked then
+      Inc(LMarcados);
+
+  if LMarcados = 0 then
+  begin
+    ShowMessage(UTF8ToString('Marque ao menos um arquivo para comitar.'));
+    Exit;
+  end;
+
+  // 1. Limpa o stage atual para garantir commit seletivo
+  FRunner.ResetStage(FProjectDir);
 
   // 2. Adiciona apenas o que o usuário marcou
   for I := 0 to lstFiles.Items.Count - 1 do
@@ -477,28 +499,30 @@ begin
     end;
   end;
 
-  Msg := Trim(memCommitMsg.Text);
-  if Msg = '' then
+  // Se nada entrou no stage o commit nao tem o que gravar: avisa em vez de
+  // seguir e exibir um "sucesso" que nao aconteceu.
+  if not FRunner.HasStagedChanges(FProjectDir) then
   begin
-    ShowMessage(UTF8ToString('Por favor, informe uma mensagem de commit.'));
+    ShowMessage(UTF8ToString('Nenhuma alteração foi para o stage. ' +
+      'Verifique se os arquivos marcados ainda possuem mudanças.'));
+    RefreshStatus;
     Exit;
   end;
 
   // 3. Comita apenas o que foi adicionado (sem o -a)
-  LOutput := FRunner.Execute(Format('git commit -m "%s"', [Msg]), FProjectDir);
-
-  if (Pos('error', LOutput) > 0) or (Pos('fatal', LOutput) > 0) then
+  if not FRunner.Commit(Msg, FProjectDir, LOutput) then
   begin
     ShowMessage(UTF8ToString('Erro ao realizar commit:') + sLineBreak + LOutput);
+    RefreshStatus;
     Exit;
   end;
 
   memCommitMsg.Clear;
   if Assigned(FSettings) then
   begin
-    FSettings.SaveTaskInfo(edtTaskNum.Text, edtTaskDesc.Text);
-    FSettings.SaveCommitDraft('');   // Limpa rascunho após commit
-    FSettings.SaveSelectedFiles(''); // Limpa seleção após commit
+    FSettings.SaveTaskInfo(GetProjectKey, edtTaskNum.Text, edtTaskDesc.Text);
+    FSettings.SaveCommitDraft(GetProjectKey, '');   // Limpa rascunho após commit
+    FSettings.SaveSelectedFiles(GetProjectKey, ''); // Limpa seleção após commit
   end;
 
   RefreshStatus;
@@ -642,7 +666,7 @@ begin
   try
     if Assigned(FSettings) then
     begin
-      FSettings.LoadSelectedFiles(LSavedStr);
+      FSettings.LoadSelectedFiles(GetProjectKey, LSavedStr);
       LSelected.CommaText := LSavedStr;
     end;
 
