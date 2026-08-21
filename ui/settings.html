@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>GitLens4D - Configuracoes</title>
+<script>
+window.onerror = function (msg, url, line) {
+  try {
+    var el = document.getElementById('bootError');
+    if (el) {
+      el.style.display = 'block';
+      el.innerHTML = 'Erro de script: ' + String(msg) + ' (linha ' + String(line) + ')';
+    }
+  } catch (e) {}
+  return true;
+};
+</script>
+<style>
+/*GITLENS_BASE_CSS*/
+
+/* ---------- especifico da tela de Configuracoes ---------- */
+.tabs {
+  padding: 0 8px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+}
+.tab {
+  display: inline-block;
+  padding: 6px 14px;
+  color: #9a9a9a;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+}
+.tab:hover { color: #d4d4d4; }
+.tab.active {
+  color: #ffffff;
+  border-bottom-color: #0e639c;
+}
+.panel { display: none; padding: 10px 12px; }
+.panel.active { display: block; }
+
+fieldset {
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  background: #252526;
+  margin: 0 0 12px 0;
+  padding: 10px 12px 12px 12px;
+}
+legend {
+  color: #9a9a9a;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 0 5px;
+}
+.field {
+  padding: 4px 0;
+  white-space: nowrap;
+}
+.field > label {
+  display: inline-block;
+  width: 150px;
+  color: #9a9a9a;
+  font-size: 11px;
+  vertical-align: middle;
+}
+.field > input[type=text],
+.field > input[type=password],
+.field > select { width: 260px; }
+.field > input.small { width: 90px; }
+.hint {
+  color: #6a6a6a;
+  font-size: 10px;
+  padding: 2px 0 0 152px;
+}
+</style>
+</head>
+<body>
+<div id="app" class="page">
+  <div id="bootError" class="banner"></div>
+
+  <div class="tabs">
+    <span class="tab active" id="tab-general" onclick="showTab('general');">Geral</span>
+    <span class="tab" id="tab-ai" onclick="showTab('ai');">Inteligencia Artificial</span>
+  </div>
+
+  <div class="body">
+    <div class="panel active" id="panel-general">
+      <fieldset>
+        <legend>Atalhos</legend>
+        <div class="field">
+          <label for="shortcutHist">Historico da linha</label>
+          <input type="text" id="shortcutHist">
+        </div>
+        <div class="field">
+          <label for="shortcutChanges">Git Changes</label>
+          <input type="text" id="shortcutChanges">
+        </div>
+        <div class="hint">Os atalhos so passam a valer depois de reiniciar o Delphi.</div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Commit</legend>
+        <div class="field">
+          <label for="commitTag">Tag extra global</label>
+          <input type="text" id="commitTag">
+        </div>
+        <div class="hint">Ex.: [skip ci], [internal]. Deixe vazio para desativar.</div>
+      </fieldset>
+    </div>
+
+    <div class="panel" id="panel-ai">
+      <fieldset>
+        <legend>Provedor</legend>
+        <div class="field">
+          <label for="aiType">Tipo</label>
+          <select id="aiType">
+            <option value="Local">Local</option>
+            <option value="openAI">openAI</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="endpoint">Endpoint</label>
+          <input type="text" id="endpoint" placeholder="http://localhost:11434/api/generate">
+        </div>
+        <div class="field">
+          <label for="apiKey">API Key</label>
+          <input type="password" id="apiKey">
+        </div>
+        <div class="field">
+          <label for="model">Modelo</label>
+          <input type="text" id="model" placeholder="llama3, gpt-4o-mini, ...">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Geracao</legend>
+        <div class="field">
+          <label for="lang">Idioma</label>
+          <select id="lang">
+            <option value="pt-BR">pt-BR</option>
+            <option value="en-US">en-US</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="format">Formato</label>
+          <select id="format">
+            <option value="Markdown">Markdown</option>
+            <option value="Texto Puro">Texto Puro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="temp">Temperatura</label>
+          <input type="text" id="temp" class="small">
+        </div>
+        <div class="field">
+          <label for="maxTokens">Max tokens</label>
+          <input type="text" id="maxTokens" class="small">
+        </div>
+      </fieldset>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="muted" id="footHint">As configuracoes valem para todos os projetos.</span>
+    <span class="right">
+      <button onclick="send({type:'cancel'});">Cancelar</button>
+      <span class="gap"></span>
+      <button class="primary" onclick="send({type:'save'});">Salvar</button>
+    </span>
+  </div>
+
+  <textarea id="copyBuffer" class="offscreen" tabindex="-1" aria-hidden="true"></textarea>
+</div>
+
+<script>
+function send(obj) {
+  try {
+    window.location.href = 'gitlens4d://action?data=' + encodeURIComponent(JSON.stringify(obj));
+  } catch (e) {}
+}
+
+function el(id) { return document.getElementById(id); }
+
+function showTab(name) {
+  var tabs = ['general', 'ai'];
+  var i, t, p;
+  for (i = 0; i < tabs.length; i++) {
+    t = el('tab-' + tabs[i]);
+    p = el('panel-' + tabs[i]);
+    if (t) { t.className = 'tab' + (tabs[i] === name ? ' active' : ''); }
+    if (p) { p.className = 'panel' + (tabs[i] === name ? ' active' : ''); }
+  }
+}
+
+function setValue(id, value) {
+  var e = el(id);
+  if (e) { e.value = value === null || value === undefined ? '' : String(value); }
+}
+
+// ---------------------------------------------- chamado a partir do Pascal
+// O Pascal escreve os valores aqui e depois LE os mesmos ids de volta pelo DOM
+// na hora de salvar -- por isso nao ha estado nenhum neste script.
+function gitSettings(json) {
+  try {
+    var d = JSON.parse(json);
+    setValue('shortcutHist', d.shortcutHist);
+    setValue('shortcutChanges', d.shortcutChanges);
+    setValue('commitTag', d.commitTag);
+    setValue('aiType', d.aiType);
+    setValue('endpoint', d.endpoint);
+    setValue('apiKey', d.apiKey);
+    setValue('model', d.model);
+    setValue('lang', d.lang);
+    setValue('format', d.format);
+    setValue('temp', d.temp);
+    setValue('maxTokens', d.maxTokens);
+    if (d.tab) { showTab(d.tab); }
+  } catch (e) {
+    var box = el('bootError');
+    if (box) {
+      box.style.display = 'block';
+      box.innerHTML = 'Falha ao aplicar as configuracoes: ' + String(e.message || e);
+    }
+  }
+}
+
+function focusedField() {
+  var a = document.activeElement;
+  if (a && typeof a.value === 'string' && typeof a.selectionStart === 'number') {
+    return a;
+  }
+  return null;
+}
+
+function gitCopySelection() {
+  var f = focusedField();
+  var text = '';
+  if (f && f.selectionEnd > f.selectionStart) {
+    text = f.value.substring(f.selectionStart, f.selectionEnd);
+  } else if (window.getSelection) {
+    text = String(window.getSelection());
+  }
+  if (!text) { return; }
+  el('copyBuffer').value = text;
+  send({ type: 'clipboard.copy' });
+}
+
+function gitCutSelection() {
+  var f = focusedField();
+  if (!f || f.selectionEnd <= f.selectionStart) { return; }
+  var start = f.selectionStart;
+  el('copyBuffer').value = f.value.substring(start, f.selectionEnd);
+  f.value = f.value.substring(0, start) + f.value.substring(f.selectionEnd);
+  f.selectionStart = start;
+  f.selectionEnd = start;
+  send({ type: 'clipboard.copy' });
+}
+
+function gitInsertText(json) {
+  try {
+    var text = JSON.parse(json).text || '';
+    var f = focusedField();
+    if (!f || !text) { return; }
+    var start = f.selectionStart;
+    f.value = f.value.substring(0, start) + text + f.value.substring(f.selectionEnd);
+    f.selectionStart = start + text.length;
+    f.selectionEnd = f.selectionStart;
+  } catch (e) {}
+}
+
+function gitSelectAllInField() {
+  var f = focusedField();
+  if (f && f.select) { f.select(); }
+}
+
+function onKeyDown(e) {
+  var ev = e || window.event;
+  var key = ev.keyCode || ev.which;
+
+  if (key === 27) { send({ type: 'cancel' }); return false; }
+  if (key === 13 && (ev.ctrlKey || ev.metaKey)) { send({ type: 'save' }); return false; }
+  return true;
+}
+
+function onReady() {
+  if (document.addEventListener) {
+    document.addEventListener('keydown', onKeyDown, false);
+  } else if (document.attachEvent) {
+    document.attachEvent('onkeydown', onKeyDown);
+  }
+  send({ type: 'ready' });
+}
+
+if (document.addEventListener) {
+  document.addEventListener('DOMContentLoaded', onReady, false);
+} else {
+  window.attachEvent('onload', onReady);
+}
+</script>
+</body>
+</html>

@@ -4,8 +4,33 @@
   GitLens4D - Janela de Status (View)
   Princípio: Single Responsibility (SRP)
 
-  Esta unidade contém o frame que será exibido como uma Tool Window
-  no Delphi IDE. Ela é responsável apenas pela exibição e interação visual.
+  Esta unidade contém o frame exibido como Tool Window no Delphi IDE. Ela é
+  responsável apenas pela exibição e interação visual.
+
+  ----------------------------------------------------------------------------
+  Por que HTML e não controles VCL
+  ----------------------------------------------------------------------------
+  A tela é desenhada em ui\status.html, dentro de um TWebBrowser hospedado por
+  TGitWebHost. A troca foi feita para ter o mesmo visual do painel do agente
+  Claude -- que não é um tema VCL, e sim uma página: no Delphi 10.2 não há como
+  chegar naquele resultado com TPanel/TListView/TButton sem desenhar cada
+  controle na mão.
+
+  A regra que organiza esta unit depois da troca:
+
+    O PASCAL É A FONTE DA VERDADE. O estado (branches, arquivos, rascunho de
+    commit) vive aqui em campos e é empurrado para o JS por PushState. O
+    documento é só a pintura -- pode ser recarregado a qualquer momento pelo
+    vigia do host e volta idêntico, porque nada de essencial mora nele.
+
+  Isso também resolve um problema de ordem: a IDE cria o frame e chama
+  RefreshStatus/RefreshBranches (ver TStatusDockManager.FrameCreated) ANTES de
+  o documento existir -- a navegação é assíncrona. Guardando o estado aqui, o
+  primeiro push acontece quando o host avisa que o documento ficou pronto.
+
+  O que NÃO mudou: toda a lógica de Git, IA e persistência é a mesma de antes,
+  chamando as mesmas interfaces (IGitRunner, IGitStatusProvider, IAIService,
+  ISettingsRepository).
   ============================================================================ }
 
 interface
@@ -17,85 +42,61 @@ uses
   System.Variants,
   System.Classes,
   System.StrUtils,
+  System.JSON,
   Vcl.Graphics,
   Vcl.Controls,
   Vcl.Forms,
   Vcl.Dialogs,
-  Vcl.ComCtrls,
   Vcl.ExtCtrls,
-  Vcl.Menus,
   Vcl.StdCtrls,
   Vcl.Clipbrd,
-  Vcl.AppEvnts,
   GitLens4D.Interfaces,
+  GitLens4D.IDE.WebHost,
   ToolsAPI,
-  System.IOUtils,
-  System.ImageList,
-  Vcl.ImgList;
+  System.IOUtils;
 
 type
   TGitStatusView = class(TFrame)
-    lstFiles: TListView;
-    pmStatus: TPopupMenu;
-    popDiff: TMenuItem;
-    popRefresh: TMenuItem;
-    popDiscard: TMenuItem;
-    pnlCommit: TPanel;
-    memCommitMsg: TMemo;
-    pnlTopMessage: TPanel;
-    lblTask: TLabel;
-    lblDesc: TLabel;
-    edtTaskNum: TEdit;
-    edtTaskDesc: TEdit;
-    Panel1: TPanel;
-    btnSuggest: TButton;
-    btnCommit: TButton;
-    btnConfig: TButton;
-    pnlBranch: TPanel;
-    cbBranches: TComboBox;
-    btnNewBranch: TButton;
-    btnPush: TButton;
-    btnPull: TButton;
-    btnCopy: TButton;
-    ImageList1: TImageList;
-    lblBranch: TLabel;
-    btnPR: TButton;
-    Splitter1: TSplitter;
-    chkSelectAll: TCheckBox;
-    lblFormat: TLabel;
-    cbFormat: TComboBox;
-    procedure cbFormatChange(Sender: TObject);
-    procedure popRefreshClick(Sender: TObject);
-    procedure popDiffClick(Sender: TObject);
-    procedure btnSuggestClick(Sender: TObject);
-    procedure btnCommitClick(Sender: TObject);
-    procedure btnConfigClick(Sender: TObject);
-    procedure btnCopyClick(Sender: TObject);
-    procedure btnNewBranchClick(Sender: TObject);
-    procedure cbBranchesChange(Sender: TObject);
-    procedure btnPushClick(Sender: TObject);
-    procedure btnPullClick(Sender: TObject);
-    procedure chkSelectAllClick(Sender: TObject);
-    procedure popDiscardClick(Sender: TObject);
-    procedure btnPRClick(Sender: TObject);
   private
+    FHost      : TGitWebHost;
     FProvider  : IGitStatusProvider;
     FRunner    : IGitRunner;
     FSettings  : ISettingsRepository;
     FAIService : IAIService;
     FProjectDir: string;
     FRepoRoot  : string;
-    FAppEvents : TApplicationEvents;
-    procedure InitClipboardHook;
-    procedure HandleAppMessage(var Msg: TMsg; var Handled: Boolean);
+
+    { Estado espelhado para o JS -- ver o cabeçalho da unit. }
+    FFiles        : TGitFileStatusArray;
+    FChecked      : TStringList; // caminhos relativos marcados
+    FBranches     : TStringList;
+    FCurrentBranch: string;
+    FAhead        : Integer;
+    FTaskNum      : string;
+    FTaskDesc     : string;
+    FCommitMsg    : string;
+    FFormat       : string;
+    FSuggesting   : Boolean;
+
+    procedure HandleAction(AAction: TJSONObject);
+    procedure HostDocumentReady(ASender: TObject);
+    procedure PushState;
+    procedure PullFromDocument;
+    function BuildStateJson: string;
+    function ActionStr(AAction: TJSONObject; const AName: string): string;
+
     procedure CheckUnsavedFiles;
     procedure CheckPendingChanges;
-    function GetStatusIcon(AKind: TGitStatusKind): Integer;
     procedure SaveSettings;
     procedure PersistSelectedFormat;
     function GetProjectKey: string;
-    function GetSelectedRelativeFile: string;
-    function GetRelativeFile(AItem: TListItem): string;
+    function StatusText(AKind: TGitStatusKind): string;
+    function RelativeFile(const AFileName: string): string;
+    function FindFile(const ARelative: string; out AIndex: Integer): Boolean;
+    procedure DoCommit;
+    procedure DoSuggest;
+    procedure DoDiff(const ARelativeFile: string);
+    procedure DoDiscard(const ARelativeFile: string);
     procedure UpdateCommitMsg(const AText: string);
     procedure EnableSuggest(AEnabled: Boolean);
   public
@@ -130,12 +131,40 @@ uses
 
 {$R *.dfm}
 
+const
+  { Ids dos elementos que o Pascal lê direto do DOM. Texto longo não cabe na
+    URL sentinela (o Trident trunca sem avisar), então a mensagem de commit, os
+    campos de tarefa e a lista de marcados viajam por aqui. }
+  ID_COMMIT_MSG     = 'commitMsg';
+  ID_TASK_NUM       = 'taskNum';
+  ID_TASK_DESC      = 'taskDesc';
+  ID_FORMAT         = 'formatSelect';
+  ID_SELECTED_FILES = 'selectedFiles';
+  ID_COPY_BUFFER    = 'copyBuffer';
+
+  { Os mesmos dois formatos que o TComboBox oferecia. }
+  FORMAT_MARKDOWN = 'Markdown';
+  FORMAT_PLAIN    = 'Texto Puro';
+
 { TGitStatusView }
+
+constructor TGitStatusView.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FChecked  := TStringList.Create;
+  FBranches := TStringList.Create;
+  FFormat   := FORMAT_MARKDOWN;
+
+  FHost                 := TGitWebHost.Create(Self, Self, 'status.html');
+  FHost.OnAction        := HandleAction;
+  FHost.OnDocumentReady := HostDocumentReady;
+end;
 
 constructor TGitStatusView.Create(AOwner: TComponent; AProvider: IGitStatusProvider; ARunner: IGitRunner;
   ASettings: ISettingsRepository; AAIService: IAIService; const AProjectDir: string);
 begin
-  inherited Create(AOwner);
+  Create(AOwner); // constrói host e listas
+
   FProvider   := AProvider;
   FRunner     := ARunner;
   FSettings   := ASettings;
@@ -148,60 +177,383 @@ begin
     FRepoRoot := StringReplace(FRepoRoot, '/', '\', [rfReplaceAll]);
   end;
 
-  InitClipboardHook;
   LoadSettings;
   RefreshStatus;
   RefreshBranches;
 end;
 
-constructor TGitStatusView.Create(AOwner: TComponent);
+destructor TGitStatusView.Destroy;
 begin
-  inherited Create(AOwner);
-  InitClipboardHook;
+  { PullFromDocument antes de salvar: o que o usuário digitou e ainda não
+    disparou onchange (foco ainda no campo) só existe no DOM. Sem isto, fechar
+    o painel com o cursor no campo perderia o texto. }
+  try
+    PullFromDocument;
+    SaveSettings;
+  except
+    { Fechamento nunca pode lançar: o frame está sendo destruído pela IDE. }
+  end;
+  FreeAndNil(FChecked);
+  FreeAndNil(FBranches);
+  inherited;
 end;
 
-procedure TGitStatusView.InitClipboardHook;
+{ ============================================================================
+  Ponte com o documento
+  ============================================================================ }
+
+procedure TGitStatusView.HostDocumentReady(ASender: TObject);
 begin
-  // A IDE intercepta Ctrl+V/C/X/A/Z (atalhos do menu Edit) antes que a
-  // mensagem chegue aos controles de janelas dockadas; por isso os edits
-  // de task não aceitavam colar. Capturamos a tecla no loop de mensagens
-  // e aplicamos a ação diretamente no edit focado deste frame.
-  FAppEvents           := TApplicationEvents.Create(Self);
-  FAppEvents.OnMessage := HandleAppMessage;
+  { O documento acabou de nascer (ou renascer, pelo vigia). Ele não sabe de
+    nada: todo o estado vem daqui. }
+  PushState;
 end;
 
-procedure TGitStatusView.HandleAppMessage(var Msg: TMsg; var Handled: Boolean);
+function TGitStatusView.ActionStr(AAction: TJSONObject; const AName: string): string;
 var
-  LCtrl: TWinControl;
-  LEdit: TCustomEdit;
+  LValue: TJSONValue;
 begin
-  if Msg.message <> WM_KEYDOWN then
+  Result := '';
+  if AAction = nil then
     Exit;
-  if (GetKeyState(VK_CONTROL) >= 0) or (GetKeyState(VK_MENU) < 0) then
+  LValue := AAction.GetValue(AName);
+  if Assigned(LValue) then
+    Result := LValue.Value;
+end;
+
+procedure TGitStatusView.HandleAction(AAction: TJSONObject);
+var
+  LType, LFile, LName: string;
+  LMetadata          : TGitProjectMetadata;
+begin
+  LType := ActionStr(AAction, 'type');
+  WebHostLogFmt('HandleAction: %s', [LType]);
+
+  if LType = 'refresh' then
+  begin
+    RefreshStatus;
+    RefreshBranches;
+  end
+  else if LType = 'commit' then
+    DoCommit
+  else if LType = 'suggest' then
+    DoSuggest
+  else if LType = 'copy' then
+  begin
+    PullFromDocument;
+    Clipboard.AsText := FCommitMsg;
+  end
+  else if (LType = 'state.save') or (LType = 'selection.changed') then
+  begin
+    PullFromDocument;
+    SaveSettings;
+  end
+  else if LType = 'format.change' then
+  begin
+    PullFromDocument;
+    PersistSelectedFormat;
+  end
+  else if LType = 'file.diff' then
+  begin
+    LFile := ActionStr(AAction, 'file');
+    if LFile <> '' then
+      DoDiff(LFile);
+  end
+  else if LType = 'file.discard' then
+  begin
+    LFile := ActionStr(AAction, 'file');
+    if LFile <> '' then
+      DoDiscard(LFile);
+  end
+  else if LType = 'branch.change' then
+  begin
+    LName := ActionStr(AAction, 'name');
+    if (LName <> '') and (LName <> FCurrentBranch) then
+    begin
+      CheckUnsavedFiles;
+      CheckPendingChanges;
+      FRunner.CheckoutBranch(LName, FProjectDir);
+      RefreshStatus;
+      RefreshBranches;
+    end;
+  end
+  else if LType = 'branch.new' then
+  begin
+    CheckUnsavedFiles;
+    CheckPendingChanges;
+    LName := InputBox('New Branch', 'Name:', '');
+    if LName <> '' then
+    begin
+      FRunner.CreateBranch(LName, FProjectDir);
+      RefreshStatus;
+      RefreshBranches;
+    end;
+  end
+  else if LType = 'push' then
+  begin
+    CheckUnsavedFiles;
+    FRunner.Push(FProjectDir);
+    RefreshStatus;
+    RefreshBranches;
+    ShowMessage('Push realizado!');
+  end
+  else if LType = 'pull' then
+  begin
+    CheckUnsavedFiles;
+    try
+      FRunner.Pull(FProjectDir);
+      RefreshStatus;
+      RefreshBranches;
+      ShowMessage('Pull realizado com sucesso!');
+    except
+      on E: Exception do
+      begin
+        RefreshStatus;
+        RefreshBranches;
+        ShowMessage(E.Message);
+      end;
+    end;
+  end
+  else if LType = 'pr' then
+  begin
+    PullFromDocument;
+    LMetadata := TGitProjectProvider.Create.GetMetadata;
+    ShowPRWindow(FRunner, FAIService, FSettings, FProjectDir, FTaskNum, FTaskDesc,
+      LMetadata.ProjectName, LMetadata.ProjectVersion);
+  end
+  else if LType = 'config' then
+    ShowSettings(FSettings, True);
+end;
+
+{ Traz do DOM o que o usuário digitou/marcou. Chamado antes de qualquer coisa
+  que dependa desses valores -- persistir, comitar, pedir sugestão. }
+procedure TGitStatusView.PullFromDocument;
+var
+  LValue: string;
+  LList : TStringList;
+  I     : Integer;
+begin
+  if not Assigned(FHost) or not FHost.DocumentReady then
     Exit;
 
-  LCtrl := FindControl(Msg.hwnd);
-  if not (LCtrl is TCustomEdit) or not ContainsControl(LCtrl) then
-    Exit;
+  if FHost.TryReadValue(ID_COMMIT_MSG, LValue) then
+    FCommitMsg := LValue;
+  if FHost.TryReadValue(ID_TASK_NUM, LValue) then
+    FTaskNum := LValue;
+  if FHost.TryReadValue(ID_TASK_DESC, LValue) then
+    FTaskDesc := LValue;
+  if FHost.TryReadValue(ID_FORMAT, LValue) and (LValue <> '') then
+    FFormat := LValue;
 
-  LEdit   := TCustomEdit(LCtrl);
-  Handled := True;
-  case Msg.wParam of
-    Ord('V'): LEdit.PasteFromClipboard;
-    Ord('C'): LEdit.CopyToClipboard;
-    Ord('X'): LEdit.CutToClipboard;
-    Ord('A'): LEdit.SelectAll;
-    Ord('Z'): LEdit.Undo;
-  else
-    Handled := False;
+  { A lista de marcados chega como um caminho por linha (ver
+    syncSelectedFiles() em ui\status.html). }
+  if FHost.TryReadValue(ID_SELECTED_FILES, LValue) then
+  begin
+    LList := TStringList.Create;
+    try
+      LList.Text := LValue;
+      FChecked.Clear;
+      for I := 0 to LList.Count - 1 do
+        if Trim(LList[I]) <> '' then
+          FChecked.Add(Trim(LList[I]));
+    finally
+      LList.Free;
+    end;
   end;
 end;
 
-destructor TGitStatusView.Destroy;
+function TGitStatusView.BuildStateJson: string;
+var
+  LRoot    : TJSONObject;
+  LFiles   : TJSONArray;
+  LBranches: TJSONArray;
+  LFormats : TJSONArray;
+  LItem    : TJSONObject;
+  I        : Integer;
+  LRel     : string;
+  LWin     : string;
 begin
-  SaveSettings;
-  inherited;
+  LRoot := TJSONObject.Create;
+  try
+    LBranches := TJSONArray.Create;
+    for I := 0 to FBranches.Count - 1 do
+      LBranches.Add(FBranches[I]);
+    LRoot.AddPair('branches', LBranches);
+    LRoot.AddPair('currentBranch', FCurrentBranch);
+    LRoot.AddPair('ahead', TJSONNumber.Create(FAhead));
+
+    LFiles := TJSONArray.Create;
+    for I := 0 to High(FFiles) do
+    begin
+      LRel := RelativeFile(FFiles[I].FileName);
+      LWin := StringReplace(LRel, '/', '\', [rfReplaceAll]);
+
+      LItem := TJSONObject.Create;
+      { 'file' e a chave de tudo (marcacao, commit, diff, discard): e o caminho
+        como o git o reporta. 'name'/'path' existem so para a pintura. }
+      LItem.AddPair('file', LRel);
+      LItem.AddPair('name', ExtractFileName(LWin));
+      LItem.AddPair('path', ExtractFilePath(LWin));
+      LItem.AddPair('status', StatusText(FFiles[I].Status));
+      LItem.AddPair('staged', TJSONBool.Create(FFiles[I].Staged));
+      LItem.AddPair('checked', TJSONBool.Create(FChecked.IndexOf(LRel) >= 0));
+      LFiles.AddElement(LItem);
+    end;
+    LRoot.AddPair('files', LFiles);
+
+    LFormats := TJSONArray.Create;
+    LFormats.Add(FORMAT_MARKDOWN);
+    LFormats.Add(FORMAT_PLAIN);
+    LRoot.AddPair('formats', LFormats);
+    LRoot.AddPair('format', FFormat);
+
+    LRoot.AddPair('taskNum', FTaskNum);
+    LRoot.AddPair('taskDesc', FTaskDesc);
+    LRoot.AddPair('commitMsg', FCommitMsg);
+    LRoot.AddPair('busy', TJSONBool.Create(FSuggesting));
+
+    Result := LRoot.ToJSON;
+  finally
+    LRoot.Free;
+  end;
 end;
+
+procedure TGitStatusView.PushState;
+begin
+  if Assigned(FHost) then
+    FHost.CallJs('gitUpdate', BuildStateJson);
+end;
+
+{ ============================================================================
+  Dados: status, branches e persistência
+  ============================================================================ }
+
+procedure TGitStatusView.RefreshStatus;
+begin
+  if Assigned(FProvider) and (FRepoRoot <> '') then
+    UpdateList(FProvider.GetStatus(FRepoRoot));
+end;
+
+procedure TGitStatusView.UpdateList(const AFiles: TGitFileStatusArray);
+var
+  LSavedStr: string;
+begin
+  FFiles := AFiles;
+
+  { Restaura a marcação salva -- é o que faz o painel reabrir com os mesmos
+    arquivos marcados de antes. Só quando ainda não há marcação em memória:
+    depois disso quem manda é o que o usuário marcou nesta sessão. }
+  if Assigned(FSettings) and (FChecked.Count = 0) then
+  begin
+    FSettings.LoadSelectedFiles(GetProjectKey, LSavedStr);
+    FChecked.CommaText := LSavedStr;
+  end;
+
+  PushState;
+end;
+
+procedure TGitStatusView.RefreshBranches;
+var
+  LBranchList: TStringList;
+begin
+  if not Assigned(FRunner) or (FProjectDir = '') then
+    Exit;
+
+  LBranchList := FRunner.GetBranches(FProjectDir);
+  try
+    FBranches.Assign(LBranchList);
+    FCurrentBranch := FRunner.GetCurrentBranch(FProjectDir);
+    { Contador do Push: quantos commits locais ainda não subiram. }
+    try
+      FAhead := FRunner.GetAheadCount(FProjectDir);
+    except
+      FAhead := 0;
+    end;
+  finally
+    LBranchList.Free;
+  end;
+
+  PushState;
+end;
+
+procedure TGitStatusView.LoadSettings;
+var
+  LTaskNum, LTaskDesc                           : string;
+  LDraft                                        : string;
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LProjFormat                                   : string;
+  LSelected                                     : string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
+begin
+  if not Assigned(FSettings) then
+    Exit;
+
+  FSettings.LoadTaskInfo(GetProjectKey, LTaskNum, LTaskDesc);
+  FTaskNum  := LTaskNum;
+  FTaskDesc := LTaskDesc;
+
+  { O rascunho é restaurado sempre (inclusive vazio): se viesse só quando
+    preenchido, o texto do projeto anterior continuaria na tela. }
+  FSettings.LoadCommitDraft(GetProjectKey, LDraft);
+  FCommitMsg := LDraft;
+
+  FSettings.LoadSelectedFiles(GetProjectKey, LSelected);
+  FChecked.CommaText := LSelected;
+
+  { Seletor de formato: a preferência do projeto atual tem prioridade sobre a
+    configuração global da IA. }
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
+  FSettings.LoadProjectFormat(GetProjectKey, LProjFormat);
+  if LProjFormat <> '' then
+    LFormat := LProjFormat;
+  if (LFormat <> FORMAT_MARKDOWN) and (LFormat <> FORMAT_PLAIN) then
+    LFormat := FORMAT_MARKDOWN;
+  FFormat := LFormat;
+
+  { Alinha a config global (lida pelo AIService) com o formato do projeto. }
+  PersistSelectedFormat;
+
+  PushState;
+end;
+
+function TGitStatusView.GetProjectKey: string;
+begin
+  if FRepoRoot <> '' then
+    Result := LowerCase(FRepoRoot)
+  else
+    Result := LowerCase(FProjectDir);
+end;
+
+procedure TGitStatusView.PersistSelectedFormat;
+var
+  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
+  LTemp                                         : Double;
+  LMaxTokens                                    : Integer;
+begin
+  if not Assigned(FSettings) or (FFormat = '') then
+    Exit;
+
+  // 1. Config global da IA (é a fonte lida pelo AIService ao gerar).
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
+  FSettings.SaveAIConfig(LType, LEndpoint, LKey, LModel, LLang, FFormat, LTemp, LMaxTokens);
+
+  // 2. Preferência por projeto (restaurada ao reabrir este repositório).
+  FSettings.SaveProjectFormat(GetProjectKey, FFormat);
+end;
+
+procedure TGitStatusView.SaveSettings;
+begin
+  if not Assigned(FSettings) then
+    Exit;
+  FSettings.SaveTaskInfo(GetProjectKey, FTaskNum, FTaskDesc);
+  FSettings.SaveCommitDraft(GetProjectKey, FCommitMsg);
+  FSettings.SaveSelectedFiles(GetProjectKey, FChecked.CommaText);
+end;
+
+{ ============================================================================
+  Guardas antes de operações que mexem na árvore
+  ============================================================================ }
 
 procedure TGitStatusView.CheckUnsavedFiles;
 var
@@ -240,249 +592,72 @@ begin
   if HasChanges then
   begin
     if MessageDlg(('Existem arquivos com mudanças não comitadas (Modified/Deleted).') + sLineBreak +
-      UTF8ToString('Deseja fazer o commit antes de prosseguir?'), mtWarning, [mbYes, mbNo], 0) = mrYes then
+      'Deseja fazer o commit antes de prosseguir?', mtWarning, [mbYes, mbNo], 0) = mrYes then
     begin
       Abort;
     end;
   end;
 end;
 
-procedure TGitStatusView.RefreshBranches;
-var
-  BranchList: TStringList;
-  Current   : string;
-  AheadCount: Integer;
+{ ============================================================================
+  Ações
+  ============================================================================ }
+
+function TGitStatusView.StatusText(AKind: TGitStatusKind): string;
 begin
-  if not Assigned(FRunner) or (FProjectDir = '') then
-    Exit;
-
-  BranchList := FRunner.GetBranches(FProjectDir);
-  try
-    cbBranches.Items.Assign(BranchList);
-    Current              := FRunner.GetCurrentBranch(FProjectDir);
-    cbBranches.ItemIndex := cbBranches.Items.IndexOf(Current);
-
-    // Atualiza contador de Push
-    try
-      AheadCount := FRunner.GetAheadCount(FProjectDir);
-      if AheadCount > 0 then
-        btnPush.Caption := Format('Push (%d)', [AheadCount])
-      else
-        btnPush.Caption := 'Push';
-    except
-      btnPush.Caption := 'Push';
-    end;
-  finally
-    BranchList.Free;
+  case AKind of
+    skModified: Result := 'Modified';
+    skAdded: Result := 'Added';
+    skDeleted: Result := 'Deleted';
+    skUntracked: Result := 'Untracked';
+    skRenamed: Result := 'Renamed';
+  else
+    Result := 'Unknown';
   end;
 end;
 
-procedure TGitStatusView.btnCopyClick(Sender: TObject);
+{ O caminho relativo como o git o reporta, sempre com '/'. É a chave usada na
+  marcação, na persistência e nos comandos -- por isso é calculado num lugar só. }
+function TGitStatusView.RelativeFile(const AFileName: string): string;
 begin
-  Clipboard.AsText := memCommitMsg.Text;
+  Result := StringReplace(AFileName, '\', '/', [rfReplaceAll]);
 end;
 
-procedure TGitStatusView.btnNewBranchClick(Sender: TObject);
-var
-  BranchName: string;
-begin
-  CheckUnsavedFiles;
-  CheckPendingChanges;
-  BranchName := InputBox('New Branch', 'Name:', '');
-  if BranchName <> '' then
-  begin
-    FRunner.CreateBranch(BranchName, FProjectDir);
-    RefreshBranches;
-    RefreshStatus;
-  end;
-end;
-
-procedure TGitStatusView.cbBranchesChange(Sender: TObject);
-begin
-  CheckUnsavedFiles;
-  CheckPendingChanges;
-  if cbBranches.ItemIndex <> -1 then
-  begin
-    FRunner.CheckoutBranch(cbBranches.Items[cbBranches.ItemIndex], FProjectDir);
-    RefreshStatus;
-    RefreshBranches;
-  end;
-end;
-
-procedure TGitStatusView.btnPushClick(Sender: TObject);
-begin
-  CheckUnsavedFiles;
-  FRunner.Push(FProjectDir);
-  RefreshStatus;
-  RefreshBranches;
-  ShowMessage('Push realizado!');
-end;
-
-procedure TGitStatusView.btnPullClick(Sender: TObject);
-begin
-  CheckUnsavedFiles;
-  try
-    FRunner.Pull(FProjectDir);
-    RefreshStatus;
-    RefreshBranches;
-    ShowMessage(UTF8ToString('Pull realizado com sucesso!'));
-  except
-    on E: Exception do
-    begin
-      RefreshStatus;
-      RefreshBranches;
-      ShowMessage(E.Message);
-    end;
-  end;
-end;
-
-procedure TGitStatusView.btnPRClick(Sender: TObject);
-var
-  LMetadata: TGitProjectMetadata;
-begin
-  LMetadata := TGitProjectProvider.Create.GetMetadata;
-  ShowPRWindow(FRunner, FAIService, FSettings, FProjectDir, edtTaskNum.Text, edtTaskDesc.Text, LMetadata.ProjectName, LMetadata.ProjectVersion);
-end;
-
-procedure TGitStatusView.chkSelectAllClick(Sender: TObject);
+function TGitStatusView.FindFile(const ARelative: string; out AIndex: Integer): Boolean;
 var
   I: Integer;
 begin
-  lstFiles.Items.BeginUpdate;
-  try
-    for I                       := 0 to lstFiles.Items.Count - 1 do
-      lstFiles.Items[I].Checked := chkSelectAll.Checked;
-  finally
-    lstFiles.Items.EndUpdate;
-  end;
-end;
-
-procedure TGitStatusView.btnConfigClick(Sender: TObject);
-begin
-  ShowSettings(FSettings, True);
-end;
-
-procedure TGitStatusView.LoadSettings;
-var
-  LTaskNum, LTaskDesc                           : string;
-  LDraft                                        : string;
-  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
-  LProjFormat                                   : string;
-  LTemp                                         : Double;
-  LMaxTokens                                    : Integer;
-begin
-  if Assigned(FSettings) then
-  begin
-    FSettings.LoadTaskInfo(GetProjectKey, LTaskNum, LTaskDesc);
-    edtTaskNum.Text  := LTaskNum;
-    edtTaskDesc.Text := LTaskDesc;
-
-    // O rascunho e restaurado sempre (inclusive vazio): se viesse so quando
-    // preenchido, o texto do projeto anterior continuaria na tela.
-    FSettings.LoadCommitDraft(GetProjectKey, LDraft);
-    memCommitMsg.Text := LDraft;
-
-    // Seletor de formato: a preferência do projeto atual tem prioridade
-    // sobre a configuração global da IA.
-    FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
-    FSettings.LoadProjectFormat(GetProjectKey, LProjFormat);
-    if LProjFormat <> '' then
-      LFormat := LProjFormat;
-
-    cbFormat.ItemIndex := cbFormat.Items.IndexOf(LFormat);
-    if cbFormat.ItemIndex = -1 then
-      cbFormat.ItemIndex := 0;
-
-    // Alinha a config global (lida pelo AIService) com o formato do projeto.
-    PersistSelectedFormat;
-  end;
-end;
-
-function TGitStatusView.GetProjectKey: string;
-begin
-  if FRepoRoot <> '' then
-    Result := LowerCase(FRepoRoot)
-  else
-    Result := LowerCase(FProjectDir);
-end;
-
-procedure TGitStatusView.PersistSelectedFormat;
-var
-  LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
-  LTemp                                         : Double;
-  LMaxTokens                                    : Integer;
-  LSelected                                     : string;
-begin
-  if not Assigned(FSettings) or (cbFormat.ItemIndex = -1) then
-    Exit;
-
-  LSelected := cbFormat.Items[cbFormat.ItemIndex];
-
-  // 1. Config global da IA (é a fonte lida pelo AIService ao gerar).
-  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
-  FSettings.SaveAIConfig(LType, LEndpoint, LKey, LModel, LLang, LSelected, LTemp, LMaxTokens);
-
-  // 2. Preferência por projeto (restaurada ao reabrir este repositório).
-  FSettings.SaveProjectFormat(GetProjectKey, LSelected);
-end;
-
-procedure TGitStatusView.cbFormatChange(Sender: TObject);
-begin
-  PersistSelectedFormat;
-end;
-
-procedure TGitStatusView.SaveSettings;
-var
-  I        : Integer;
-  LSelected: TStringList;
-begin
-  if Assigned(FSettings) then
-  begin
-    FSettings.SaveTaskInfo(GetProjectKey, edtTaskNum.Text, edtTaskDesc.Text);
-    FSettings.SaveCommitDraft(GetProjectKey, memCommitMsg.Text);
-
-    // Salva quais arquivos estão marcados
-    LSelected := TStringList.Create;
-    try
-      for I := 0 to lstFiles.Items.Count - 1 do
-      begin
-        if lstFiles.Items[I].Checked then
-          LSelected.Add(GetRelativeFile(lstFiles.Items[I]));
-      end;
-      FSettings.SaveSelectedFiles(GetProjectKey, LSelected.CommaText);
-    finally
-      LSelected.Free;
+  Result := False;
+  AIndex := -1;
+  for I  := 0 to High(FFiles) do
+    if SameText(RelativeFile(FFiles[I].FileName), ARelative) then
+    begin
+      AIndex := I;
+      Exit(True);
     end;
-  end;
 end;
 
-procedure TGitStatusView.btnCommitClick(Sender: TObject);
+procedure TGitStatusView.DoCommit;
 var
-  Msg      : string;
-  I        : Integer;
-  FilePath : string;
-  LOutput  : string;
-  LMarcados: Integer;
+  I      : Integer;
+  LOutput: string;
+  LMsg   : string;
 begin
   CheckUnsavedFiles;
+  PullFromDocument;
 
-  // A mensagem e validada antes de mexer no stage: assim uma mensagem vazia
-  // nao deixa o repositorio com o stage ja limpo pelo reset.
-  Msg := Trim(memCommitMsg.Text);
-  if Msg = '' then
+  { A mensagem é validada antes de mexer no stage: assim uma mensagem vazia não
+    deixa o repositório com o stage já limpo pelo reset. }
+  LMsg := Trim(FCommitMsg);
+  if LMsg = '' then
   begin
-    ShowMessage(UTF8ToString('Por favor, informe uma mensagem de commit.'));
+    ShowMessage('Por favor, informe uma mensagem de commit.');
     Exit;
   end;
 
-  LMarcados := 0;
-  for I := 0 to lstFiles.Items.Count - 1 do
-    if lstFiles.Items[I].Checked then
-      Inc(LMarcados);
-
-  if LMarcados = 0 then
+  if FChecked.Count = 0 then
   begin
-    ShowMessage(UTF8ToString('Marque ao menos um arquivo para comitar.'));
+    ShowMessage('Marque ao menos um arquivo para comitar.');
     Exit;
   end;
 
@@ -490,98 +665,89 @@ begin
   FRunner.ResetStage(FProjectDir);
 
   // 2. Adiciona apenas o que o usuário marcou
-  for I := 0 to lstFiles.Items.Count - 1 do
-  begin
-    if lstFiles.Items[I].Checked then
-    begin
-      FilePath := GetRelativeFile(lstFiles.Items[I]);
-      FRunner.AddFile(FilePath, FProjectDir);
-    end;
-  end;
+  for I := 0 to FChecked.Count - 1 do
+    FRunner.AddFile(FChecked[I], FProjectDir);
 
-  // Se nada entrou no stage o commit nao tem o que gravar: avisa em vez de
-  // seguir e exibir um "sucesso" que nao aconteceu.
+  { Se nada entrou no stage, o commit não tem o que gravar: avisa em vez de
+    seguir e exibir um "sucesso" que não aconteceu. }
   if not FRunner.HasStagedChanges(FProjectDir) then
   begin
-    ShowMessage(UTF8ToString('Nenhuma alteração foi para o stage. ' +
-      'Verifique se os arquivos marcados ainda possuem mudanças.'));
+    ShowMessage('Nenhuma alteração foi para o stage. ' +
+      'Verifique se os arquivos marcados ainda possuem mudanças.');
     RefreshStatus;
     Exit;
   end;
 
   // 3. Comita apenas o que foi adicionado (sem o -a)
-  if not FRunner.Commit(Msg, FProjectDir, LOutput) then
+  if not FRunner.Commit(LMsg, FProjectDir, LOutput) then
   begin
-    ShowMessage(UTF8ToString('Erro ao realizar commit:') + sLineBreak + LOutput);
+    ShowMessage('Erro ao realizar commit:' + sLineBreak + LOutput);
     RefreshStatus;
     Exit;
   end;
 
-  memCommitMsg.Clear;
+  FCommitMsg := '';
+  FChecked.Clear;
   if Assigned(FSettings) then
   begin
-    FSettings.SaveTaskInfo(GetProjectKey, edtTaskNum.Text, edtTaskDesc.Text);
+    FSettings.SaveTaskInfo(GetProjectKey, FTaskNum, FTaskDesc);
     FSettings.SaveCommitDraft(GetProjectKey, '');   // Limpa rascunho após commit
     FSettings.SaveSelectedFiles(GetProjectKey, ''); // Limpa seleção após commit
   end;
 
   RefreshStatus;
   RefreshBranches;
-  ShowMessage(UTF8ToString('Commit realizado com sucesso!'));
-end;
-
-function TGitStatusView.GetSelectedRelativeFile: string;
-begin
-  Result := GetRelativeFile(lstFiles.Selected);
-end;
-
-function TGitStatusView.GetRelativeFile(AItem: TListItem): string;
-var
-  LPath: string;
-begin
-  Result := '';
-  if AItem = nil then
-    Exit;
-
-  LPath := AItem.SubItems[0];
-  // Garante que o path termine com barra antes de concatenar o nome do arquivo
-  if (LPath <> '') and (LPath <> '.\') and (LPath <> './') then
-  begin
-    if not LPath.EndsWith('\') and not LPath.EndsWith('/') then
-      LPath := LPath + '\';
-  end;
-
-  if (LPath = '.\') or (LPath = './') then
-    LPath := '';
-
-  Result := LPath + AItem.Caption;
-  Result := StringReplace(Result, '\', '/', [rfReplaceAll]);
+  ShowMessage('Commit realizado com sucesso!');
 end;
 
 procedure TGitStatusView.UpdateCommitMsg(const AText: string);
+var
+  LJson: TJSONObject;
 begin
-  memCommitMsg.Text := AText;
+  FCommitMsg := AText;
+  { Só o campo da mensagem, e não um PushState inteiro: a sugestão chega depois
+    e não pode redesenhar a lista nem roubar o foco de quem está digitando. }
+  if Assigned(FHost) then
+  begin
+    LJson := TJSONObject.Create;
+    try
+      LJson.AddPair('text', AText);
+      LJson.AddPair('busy', TJSONBool.Create(FSuggesting));
+      FHost.CallJs('gitCommitMsg', LJson.ToJSON);
+    finally
+      LJson.Free;
+    end;
+  end;
   SaveSettings; // Salva no registro ao receber sugestão da IA
 end;
 
 procedure TGitStatusView.EnableSuggest(AEnabled: Boolean);
+var
+  LJson: TJSONObject;
 begin
-  btnSuggest.Enabled := AEnabled;
-  if AEnabled then
-    btnSuggest.Caption := 'Suggest AI'
-  else
-    btnSuggest.Caption := 'Thinking...';
+  FSuggesting := not AEnabled;
+  if not Assigned(FHost) then
+    Exit;
+  LJson := TJSONObject.Create;
+  try
+    LJson.AddPair('busy', TJSONBool.Create(FSuggesting));
+    FHost.CallJs('gitBusy', LJson.ToJSON);
+  finally
+    LJson.Free;
+  end;
 end;
 
-procedure TGitStatusView.btnSuggestClick(Sender: TObject);
+procedure TGitStatusView.DoSuggest;
 var
   LDiff              : string;
-  LTaskNum, LTaskDesc: string;
   LView              : TGitStatusView;
   LMetadata          : TGitProjectMetadata;
+  LTaskNum, LTaskDesc: string;
 begin
+  PullFromDocument;
   SaveSettings;
   PersistSelectedFormat; // garante que a IA use o formato selecionado na tela
+
   if not Assigned(FAIService) then
   begin
     ShowMessage('AI Service not initialized.');
@@ -590,21 +756,21 @@ begin
 
   if not FAIService.IsConfigured then
   begin
-    ShowMessage(UTF8ToString('IA não configurada! Por favor, clique no botão "IA" para configurar o endpoint e o modelo antes de solicitar sugestões.'));
+    ShowMessage('IA não configurada! Por favor, clique no botão "IA" para configurar ' +
+      'o endpoint e o modelo antes de solicitar sugestões.');
     Exit;
   end;
 
   LMetadata := TGitProjectProvider.Create.GetMetadata;
-
-  LTaskNum  := edtTaskNum.Text;
-  LTaskDesc := edtTaskDesc.Text;
+  LTaskNum  := FTaskNum;
+  LTaskDesc := FTaskDesc;
 
   EnableSuggest(False);
 
   LDiff := FRunner.Execute('git diff HEAD', FProjectDir);
   if LDiff.Trim = '' then
   begin
-    ShowMessage(UTF8ToString('Não há alterações detectadas para sugerir uma mensagem.'));
+    ShowMessage('Não há alterações detectadas para sugerir uma mensagem.');
     EnableSuggest(True);
     Exit;
   end;
@@ -616,15 +782,15 @@ begin
       LSuggestion: string;
     begin
       try
-        LSuggestion := FAIService.GenerateCommitMessage(LTaskNum, LTaskDesc, LDiff, LMetadata.ProjectName, LMetadata.ProjectVersion);
-
+        LSuggestion := FAIService.GenerateCommitMessage(LTaskNum, LTaskDesc, LDiff,
+          LMetadata.ProjectName, LMetadata.ProjectVersion);
         TThread.Synchronize(nil,
           procedure
           begin
             if Assigned(LView) then
             begin
-              LView.UpdateCommitMsg(LSuggestion);
               LView.EnableSuggest(True);
+              LView.UpdateCommitMsg(LSuggestion);
             end;
           end);
       except
@@ -636,160 +802,71 @@ begin
             begin
               if Assigned(LView) then
               begin
-                LView.UpdateCommitMsg(UTF8ToString('Erro: ') + LSuggestion);
                 LView.EnableSuggest(True);
+                LView.UpdateCommitMsg('Erro: ' + LSuggestion);
               end;
             end);
         end;
       end;
-
     end).Start;
 end;
 
-procedure TGitStatusView.RefreshStatus;
-begin
-  if Assigned(FProvider) and (FRepoRoot <> '') then
-    UpdateList(FProvider.GetStatus(FRepoRoot));
-end;
-
-procedure TGitStatusView.UpdateList(const AFiles: TGitFileStatusArray);
+procedure TGitStatusView.DoDiff(const ARelativeFile: string);
 var
-  I        : Integer;
-  Item     : TListItem;
-  LPath    : string;
-  LFileName: string;
-  LSelected: TStringList;
-  LRelFile : string;
-  LSavedStr: string;
+  LDiffText: string;
+  LIndex   : Integer;
+  LStatus  : TGitStatusKind;
 begin
-  LSelected := TStringList.Create;
-  try
-    if Assigned(FSettings) then
-    begin
-      FSettings.LoadSelectedFiles(GetProjectKey, LSavedStr);
-      LSelected.CommaText := LSavedStr;
-    end;
-
-    lstFiles.Items.BeginUpdate;
-    try
-      lstFiles.Items.Clear;
-      for I := 0 to High(AFiles) do
-      begin
-        Item         := lstFiles.Items.Add;
-        LFileName    := AFiles[I].FileName.Replace('/', '\');
-        Item.Caption := ExtractFileName(LFileName);
-
-        LPath := ExtractFilePath(LFileName);
-        if LPath = '' then
-          LPath := '.\'
-        else
-          LPath := '.\' + LPath.Trim(['\']);
-
-        Item.SubItems.Add(LPath);
-
-        case AFiles[I].Status of
-          skModified: Item.SubItems.Add('Modified');
-          skAdded: Item.SubItems.Add('Added');
-          skDeleted: Item.SubItems.Add('Deleted');
-          skUntracked: Item.SubItems.Add('Untracked');
-          skRenamed: Item.SubItems.Add('Renamed');
-        else
-            Item.SubItems.Add('Unknown');
-        end;
-
-        // Armazena o path relativo original (do git) no Data ou em um local seguro
-        // Aqui vamos reconstruir no GetRelativeFile baseado no Caption e SubItems[0]
-
-        Item.Data := Pointer(AFiles[I].Status);
-
-        if AFiles[I].Staged then
-          Item.SubItems[Item.SubItems.Count - 1] := Item.SubItems[Item.SubItems.Count - 1] + ' (Staged)';
-
-        // Restaura a seleção se o arquivo estava marcado
-        LRelFile := GetRelativeFile(Item);
-        if LSelected.IndexOf(LRelFile) >= 0 then
-          Item.Checked := True;
-      end;
-    finally
-      lstFiles.Items.EndUpdate;
-    end;
-  finally
-    LSelected.Free;
-  end;
-end;
-
-procedure TGitStatusView.popRefreshClick(Sender: TObject);
-begin
-  RefreshStatus;
-  RefreshBranches;
-end;
-
-procedure TGitStatusView.popDiffClick(Sender: TObject);
-var
-  LRelativeFile: string;
-  LDiffText    : string;
-  LStatus      : TGitStatusKind;
-begin
-  if lstFiles.Selected = nil then
-    Exit;
-
-  LRelativeFile := GetSelectedRelativeFile;
-  if LRelativeFile = '' then
-    Exit;
-
-  LStatus := TGitStatusKind(lstFiles.Selected.Data);
+  LStatus := skUnknown;
+  if FindFile(ARelativeFile, LIndex) then
+    LStatus := FFiles[LIndex].Status;
 
   if LStatus = skUntracked then
   begin
     // Para arquivos novos, mostramos o conteúdo inteiro como adicionado (+)
     try
-      LDiffText := FRunner.Execute(Format('git diff --no-index -- NUL "%s"', [LRelativeFile]), FRepoRoot);
+      LDiffText := FRunner.Execute(Format('git diff --no-index -- NUL "%s"', [ARelativeFile]), FRepoRoot);
       // Se falhar ou NUL não funcionar, tenta ler o arquivo e prefixar com +
       if LDiffText.Trim = '' then
       begin
         LDiffText := '--- /dev/null' + sLineBreak +
-          '+++ b/' + LRelativeFile + sLineBreak +
+          '+++ b/' + ARelativeFile + sLineBreak +
           '@@ -0,0 +1 @@' + sLineBreak +
-          '+' + StringReplace(TFile.ReadAllText(FRepoRoot + LRelativeFile.Replace('/', '\')), sLineBreak, sLineBreak + '+', [rfReplaceAll]);
+          '+' + StringReplace(TFile.ReadAllText(FRepoRoot + ARelativeFile.Replace('/', '\')),
+          sLineBreak, sLineBreak + '+', [rfReplaceAll]);
       end;
     except
       on E: Exception do
-        LDiffText := UTF8ToString('Erro ao ler arquivo untracked: ') + E.Message;
+        LDiffText := 'Erro ao ler arquivo untracked: ' + E.Message;
     end;
   end
   else
-  begin
-    LDiffText := FRunner.GetDiff(LRelativeFile, FRepoRoot);
-  end;
+    LDiffText := FRunner.GetDiff(ARelativeFile, FRepoRoot);
 
   if LDiffText.Trim = '' then
   begin
-    ShowMessage(UTF8ToString('Nenhuma diferença textual detectada.'));
+    ShowMessage('Nenhuma diferença textual detectada.');
     Exit;
   end;
 
-  ShowDiff(LRelativeFile, LDiffText);
+  ShowDiff(ARelativeFile, LDiffText);
 end;
 
-procedure TGitStatusView.popDiscardClick(Sender: TObject);
+procedure TGitStatusView.DoDiscard(const ARelativeFile: string);
 var
-  LFile: string;
+  LIndex: Integer;
 begin
-  LFile := GetSelectedRelativeFile;
-  if LFile = '' then
-    Exit;
-
-  if MessageDlg(('Deseja realmente DESCARTAR todas as alterações do arquivo:') + sLineBreak + LFile + '?',
-    mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  if MessageDlg(('Deseja realmente DESCARTAR todas as alterações do arquivo:') + sLineBreak +
+    ARelativeFile + '?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
   begin
-    FRunner.DiscardChanges(LFile, FRepoRoot);
+    FRunner.DiscardChanges(ARelativeFile, FRepoRoot);
+    { Sai também da marcação: o arquivo não tem mais o que comitar, e deixá-lo
+      marcado faria o próximo commit tentar adicionar um caminho sem mudança. }
+    LIndex := FChecked.IndexOf(ARelativeFile);
+    if LIndex >= 0 then
+      FChecked.Delete(LIndex);
     RefreshStatus;
   end;
-end;
-
-function TGitStatusView.GetStatusIcon(AKind: TGitStatusKind): Integer;
-begin
-  Result := -1;
 end;
 
 end.

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>GitLens4D - Pull Request</title>
+<script>
+window.onerror = function (msg, url, line) {
+  try {
+    var el = document.getElementById('bootError');
+    if (el) {
+      el.style.display = 'block';
+      el.innerHTML = 'Erro de script: ' + String(msg) + ' (linha ' + String(line) + ')';
+    }
+  } catch (e) {}
+  return true;
+};
+</script>
+<style>
+/*GITLENS_BASE_CSS*/
+
+/* ---------- especifico da tela de Pull Request ---------- */
+#title {
+  color: #e6e6e6;
+  font-size: 13px;
+  font-weight: 600;
+}
+#formatSelect { min-width: 118px; }
+#prBody {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  border: none;
+  border-radius: 0;
+  background: #1e1e1e;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 17px;
+  padding: 10px 12px;
+  resize: none;
+  display: block;
+}
+#prBody:focus { border: none; outline: none; }
+#taskInfo { padding-left: 10px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="app" class="page">
+  <div id="bootError" class="banner"></div>
+
+  <div class="head">
+    <span id="title">Elabore a descricao do seu Pull Request</span>
+    <span id="taskInfo" class="muted"></span>
+    <span class="right">
+      <span class="k">Formato</span>
+      <select id="formatSelect" onchange="onFormatChange();"></select>
+    </span>
+  </div>
+
+  <div class="body">
+    <textarea id="prBody" spellcheck="false"
+      placeholder="Escreva a descricao do PR, ou clique em Sugerir IA para gerar a partir do diff."></textarea>
+  </div>
+
+  <div class="foot">
+    <button id="btnSuggest" onclick="send({type:'suggest'});">Sugerir IA</button>
+    <span class="gap"></span>
+    <button onclick="send({type:'copyOpen'});" title="Copia a descricao e abre a pagina de comparacao no navegador">
+      Copiar e abrir PR
+    </button>
+    <span class="right">
+      <button class="primary" onclick="send({type:'close'});">Fechar</button>
+    </span>
+  </div>
+
+  <textarea id="copyBuffer" class="offscreen" tabindex="-1" aria-hidden="true"></textarea>
+</div>
+
+<script>
+function send(obj) {
+  try {
+    window.location.href = 'gitlens4d://action?data=' + encodeURIComponent(JSON.stringify(obj));
+  } catch (e) {}
+}
+
+function el(id) { return document.getElementById(id); }
+
+function escapeHtml(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function setBusy(busy) {
+  var b = el('btnSuggest');
+  b.disabled = !!busy;
+  b.innerHTML = busy ? 'Pensando...' : 'Sugerir IA';
+}
+
+function onFormatChange() {
+  send({ type: 'format.change', format: el('formatSelect').value });
+}
+
+// ---------------------------------------------- chamado a partir do Pascal
+function gitPR(json) {
+  try {
+    var d = JSON.parse(json);
+    var formats = d.formats || [];
+    var html = '';
+    var i;
+    for (i = 0; i < formats.length; i++) {
+      html += '<option value="' + escapeHtml(formats[i]) + '">' + escapeHtml(formats[i]) + '</option>';
+    }
+    el('formatSelect').innerHTML = html;
+    if (d.format) { el('formatSelect').value = d.format; }
+
+    if (d.body !== undefined) { el('prBody').value = d.body || ''; }
+    el('taskInfo').innerHTML = escapeHtml(d.taskInfo || '');
+    setBusy(d.busy);
+  } catch (e) {
+    var box = el('bootError');
+    if (box) {
+      box.style.display = 'block';
+      box.innerHTML = 'Falha ao montar a tela: ' + escapeHtml(e.message || e);
+    }
+  }
+}
+
+// So o corpo: a sugestao chega depois e nao pode redesenhar o resto nem roubar
+// o foco de quem estiver editando.
+function gitPRBody(json) {
+  try {
+    var d = JSON.parse(json);
+    el('prBody').value = d.text || '';
+    if (d.busy !== undefined) { setBusy(d.busy); }
+  } catch (e) {}
+}
+
+function gitBusy(json) {
+  try { setBusy(JSON.parse(json).busy); } catch (e) {}
+}
+
+function focusedField() {
+  var a = document.activeElement;
+  if (a && typeof a.value === 'string' && typeof a.selectionStart === 'number') {
+    return a;
+  }
+  return null;
+}
+
+function gitCopySelection() {
+  var f = focusedField();
+  var text = '';
+  if (f && f.selectionEnd > f.selectionStart) {
+    text = f.value.substring(f.selectionStart, f.selectionEnd);
+  } else if (window.getSelection) {
+    text = String(window.getSelection());
+  }
+  if (!text) { text = el('prBody').value; }
+  if (!text) { return; }
+  el('copyBuffer').value = text;
+  send({ type: 'clipboard.copy' });
+}
+
+function gitCutSelection() {
+  var f = focusedField();
+  if (!f || f.selectionEnd <= f.selectionStart) { return; }
+  var start = f.selectionStart;
+  el('copyBuffer').value = f.value.substring(start, f.selectionEnd);
+  f.value = f.value.substring(0, start) + f.value.substring(f.selectionEnd);
+  f.selectionStart = start;
+  f.selectionEnd = start;
+  send({ type: 'clipboard.copy' });
+}
+
+function gitInsertText(json) {
+  try {
+    var text = JSON.parse(json).text || '';
+    var f = focusedField();
+    if (!f || !text) { return; }
+    var start = f.selectionStart;
+    f.value = f.value.substring(0, start) + text + f.value.substring(f.selectionEnd);
+    f.selectionStart = start + text.length;
+    f.selectionEnd = f.selectionStart;
+  } catch (e) {}
+}
+
+function gitSelectAllInField() {
+  var f = focusedField();
+  if (f && f.select) { f.select(); }
+}
+
+function onKeyDown(e) {
+  var ev = e || window.event;
+  var key = ev.keyCode || ev.which;
+  if (key === 27) { send({ type: 'close' }); return false; }
+  return true;
+}
+
+function onReady() {
+  if (document.addEventListener) {
+    document.addEventListener('keydown', onKeyDown, false);
+  } else if (document.attachEvent) {
+    document.attachEvent('onkeydown', onKeyDown);
+  }
+  send({ type: 'ready' });
+}
+
+if (document.addEventListener) {
+  document.addEventListener('DOMContentLoaded', onReady, false);
+} else {
+  window.attachEvent('onload', onReady);
+}
+</script>
+</body>
+</html>

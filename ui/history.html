@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>GitLens4D - Historico</title>
+<script>
+window.onerror = function (msg, url, line) {
+  try {
+    var el = document.getElementById('bootError');
+    if (el) {
+      el.style.display = 'block';
+      el.innerHTML = 'Erro de script: ' + String(msg) + ' (linha ' + String(line) + ')';
+    }
+  } catch (e) {}
+  return true;
+};
+</script>
+<style>
+/*GITLENS_BASE_CSS*/
+
+/* ---------- especifico da tela de Historico ---------- */
+/* Master-detail: lista em cima com altura propria, patch embaixo ocupando o
+   resto. Duas regioes com rolagem independente -- por isso o min-height:0 em
+   cada uma (sem ele o filho com overflow estoura o flex no Trident). */
+#listRegion {
+  flex: 0 0 auto;
+  -ms-flex: 0 0 auto;
+  height: 38%;
+  overflow: auto;
+  min-height: 60px;
+  border-bottom: 1px solid #3c3c3c;
+}
+#patchRegion {
+  flex: 1 1 auto;
+  -ms-flex: 1 1 auto;
+  overflow: auto;
+  min-height: 0;
+}
+.commit .hash {
+  color: #d7ba7d;
+  font-family: Consolas, "Courier New", monospace;
+  padding-right: 8px;
+}
+.commit .author { color: #9cdcfe; padding-right: 8px; }
+.commit .date   { color: #6a6a6a; padding-right: 8px; font-size: 11px; }
+.commit .msg    { color: #d4d4d4; }
+#patchHead {
+  padding: 4px 8px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  color: #9a9a9a;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>
+</head>
+<body>
+<div id="app" class="page">
+  <div id="bootError" class="banner"></div>
+
+  <div class="head">
+    <span class="k">Linha</span><span id="where" class="mono"></span>
+    <span class="right">
+      <button onclick="send({type:'copy'});" title="Copiar o patch mostrado">Copiar</button>
+      <span class="gap"></span>
+      <button class="primary" onclick="send({type:'close'});">Fechar</button>
+    </span>
+  </div>
+
+  <div id="listRegion">
+    <div id="commitsEmpty" class="empty">Nenhum commit encontrado para esta linha.</div>
+    <div id="commits"></div>
+  </div>
+
+  <div id="patchHead"></div>
+  <div id="patchRegion">
+    <div id="patch" class="diff"></div>
+  </div>
+
+  <textarea id="copyBuffer" class="offscreen" tabindex="-1" aria-hidden="true"></textarea>
+</div>
+
+<script>
+function send(obj) {
+  try {
+    window.location.href = 'gitlens4d://action?data=' + encodeURIComponent(JSON.stringify(obj));
+  } catch (e) {}
+}
+
+function el(id) { return document.getElementById(id); }
+
+function escapeHtml(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/*GITLENS_DIFF_JS*/
+
+var commits = [];
+var current = -1;
+
+function renderCommits() {
+  var html = [];
+  var i, c;
+  for (i = 0; i < commits.length; i++) {
+    c = commits[i];
+    html.push(
+      '<div class="row-item commit" id="c-' + i + '" onclick="selectCommit(' + i + ');">' +
+        '<span class="hash">' + escapeHtml(c.hash) + '</span>' +
+        '<span class="author">' + escapeHtml(c.author) + '</span>' +
+        '<span class="date">' + escapeHtml(c.date) + '</span>' +
+        '<span class="msg">' + escapeHtml(c.message) + '</span>' +
+      '</div>');
+  }
+  el('commits').innerHTML = html.join('');
+  el('commitsEmpty').style.display = commits.length === 0 ? 'block' : 'none';
+}
+
+function selectCommit(i) {
+  var prev = el('c-' + current);
+  if (prev) { prev.className = 'row-item commit'; }
+  current = i;
+  var row = el('c-' + i);
+  if (row) { row.className = 'row-item commit sel'; }
+
+  var c = commits[i];
+  if (!c) { return; }
+  var stat = renderDiffInto(el('patch'), c.patch || '');
+  el('patchHead').innerHTML =
+    '<span class="mono">' + escapeHtml(c.hash) + '</span> &middot; ' +
+    escapeHtml(c.message) + ' <span class="stat right">' + diffStatHtml(stat) + '</span>';
+  el('patchRegion').scrollTop = 0;
+}
+
+// ---------------------------------------------- chamado a partir do Pascal
+function gitHistory(json) {
+  try {
+    var data = JSON.parse(json);
+    commits = data.commits || [];
+    el('where').innerHTML = escapeHtml(data.where || '');
+    renderCommits();
+    if (commits.length > 0) { selectCommit(0); }
+  } catch (e) {
+    var box = el('bootError');
+    if (box) {
+      box.style.display = 'block';
+      box.innerHTML = 'Falha ao montar o historico: ' + escapeHtml(e.message || e);
+    }
+  }
+}
+
+function gitCopySelection() {
+  var text = '';
+  try {
+    if (window.getSelection) { text = String(window.getSelection()); }
+  } catch (e) {}
+  if (!text && commits[current]) { text = commits[current].patch || ''; }
+  el('copyBuffer').value = text;
+  send({ type: 'clipboard.copy' });
+}
+
+function onKeyDown(e) {
+  var ev = e || window.event;
+  var key = ev.keyCode || ev.which;
+
+  if (key === 27) { send({ type: 'close' }); return false; }
+
+  // Setas navegam a lista de commits, como no ListView antigo.
+  if (key === 38 && current > 0) {
+    selectCommit(current - 1);
+    if (ev.preventDefault) { ev.preventDefault(); } else { ev.returnValue = false; }
+    return false;
+  }
+  if (key === 40 && current < commits.length - 1) {
+    selectCommit(current + 1);
+    if (ev.preventDefault) { ev.preventDefault(); } else { ev.returnValue = false; }
+    return false;
+  }
+
+  if ((ev.ctrlKey || ev.metaKey) && (key === 67 || key === 45)) {
+    gitCopySelection();
+    if (ev.preventDefault) { ev.preventDefault(); } else { ev.returnValue = false; }
+    return false;
+  }
+  return true;
+}
+
+function onReady() {
+  if (document.addEventListener) {
+    document.addEventListener('keydown', onKeyDown, false);
+  } else if (document.attachEvent) {
+    document.attachEvent('onkeydown', onKeyDown);
+  }
+  send({ type: 'ready' });
+}
+
+if (document.addEventListener) {
+  document.addEventListener('DOMContentLoaded', onReady, false);
+} else {
+  window.attachEvent('onload', onReady);
+}
+</script>
+</body>
+</html>

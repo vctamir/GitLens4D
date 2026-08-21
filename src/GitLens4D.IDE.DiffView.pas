@@ -4,8 +4,13 @@
   GitLens4D - Visualizador de Diferenças (Diff)
   Princípio: Single Responsibility (SRP)
 
-  Responsabilidade: Exibir o Diff do arquivo com cores (Verde/Vermelho)
-  seguindo o estilo clássico do Git.
+  Responsabilidade: Exibir o Diff do arquivo com as cores clássicas do Git.
+
+  A pintura é feita em ui\diff.html, dentro do TWebBrowser hospedado por
+  TGitWebHost -- o mesmo host das outras telas do plugin. O TRichEdit anterior
+  era o pior lugar possível para um diff: cada linha exigia um EM_SETCHARFORMAT
+  na mão, o fundo colorido não cobria a linha inteira e não havia número de
+  linha. Em HTML isso é CSS, e ainda sobra a numeração pelo arquivo novo.
   ============================================================================ }
 
 interface
@@ -13,28 +18,27 @@ interface
 uses
   Winapi.Windows,
   Winapi.Messages,
-  Winapi.RichEdit,
   System.SysUtils,
   System.Variants,
   System.Classes,
+  System.JSON,
   Vcl.Graphics,
   Vcl.Controls,
   Vcl.Forms,
   Vcl.Dialogs,
-  Vcl.StdCtrls,
-  Vcl.ComCtrls,
-  Vcl.ExtCtrls,
+  GitLens4D.IDE.WebHost,
   ToolsAPI;
 
 type
   TGitDiffView = class(TForm)
-    redDiff: TRichEdit;
-    pnlBottom: TPanel;
-    btnClose: TButton;
-    procedure btnCloseClick(Sender: TObject);
   private
+    FHost    : TGitWebHost;
+    FFileName: string;
+    FDiffText: string;
     procedure ApplyTheme;
-    procedure AddColoredLine(const AText: string; AColor: TColor);
+    procedure HandleAction(AAction: TJSONObject);
+    procedure HostDocumentReady(ASender: TObject);
+    procedure PushDiff;
   public
     constructor Create(AOwner: TComponent; const AFileName, ADiffText: string); reintroduce;
   end;
@@ -44,7 +48,6 @@ procedure ShowDiff(const AFileName, ADiffText: string);
 implementation
 
 {$R *.dfm}
-
 
 procedure ShowDiff(const AFileName, ADiffText: string);
 var
@@ -61,79 +64,69 @@ end;
 { TGitDiffView }
 
 constructor TGitDiffView.Create(AOwner: TComponent; const AFileName, ADiffText: string);
-var
-  Lines: TStringList;
-  I    : Integer;
-  Line : string;
 begin
   inherited Create(AOwner);
+  FFileName := AFileName;
+  FDiffText := ADiffText;
+
   Caption := 'Diff: ' + AFileName;
   ApplyTheme;
 
-  Lines := TStringList.Create;
-  try
-    Lines.Text := ADiffText;
-    redDiff.Lines.BeginUpdate;
-    try
-      redDiff.Clear;
-      for I := 0 to Lines.Count - 1 do
-      begin
-        Line := Lines[I];
-        if Line.StartsWith('+') and not Line.StartsWith('+++') then
-          AddColoredLine(Line, $00D0FFD0) // Verde claro
-        else if Line.StartsWith('-') and not Line.StartsWith('---') then
-          AddColoredLine(Line, $00D0D0FF) // Vermelho claro
-        else if Line.StartsWith('@@') then
-          AddColoredLine(Line, $00FFFFE0) // Ciano/Azul claro
-        else
-          AddColoredLine(Line, clWindowText);
-      end;
-    finally
-      redDiff.Lines.EndUpdate;
-    end;
-  finally
-    Lines.Free;
-  end;
-end;
-
-procedure TGitDiffView.AddColoredLine(const AText: string; AColor: TColor);
-var
-  Format: TCharFormat2;
-begin
-  redDiff.SelStart            := Length(redDiff.Text);
-  redDiff.SelAttributes.Color := clBlack;
-  redDiff.Lines.Add(AText);
-
-  if AColor <> clWindowText then
-  begin
-    redDiff.SelStart  := Length(redDiff.Text) - Length(AText) - 2;
-    redDiff.SelLength := Length(AText) + 1;
-
-    FillChar(Format, SizeOf(Format), 0);
-    Format.cbSize      := SizeOf(Format);
-    Format.dwMask      := CFM_BACKCOLOR;
-    Format.crBackColor := ColorToRGB(AColor);
-
-    SendMessage(redDiff.Handle, EM_SETCHARFORMAT, SCF_SELECTION, LPARAM(@Format));
-    redDiff.SelAttributes.Style := [fsBold];
-  end;
-
-  redDiff.SelStart  := Length(redDiff.Text);
-  redDiff.SelLength := 0;
+  { O diff só é empurrado quando o documento avisa que está pronto -- a
+    navegação é assíncrona e neste ponto não há DOM nenhum. }
+  FHost                 := TGitWebHost.Create(Self, Self, 'diff.html');
+  FHost.OnAction        := HandleAction;
+  FHost.OnDocumentReady := HostDocumentReady;
 end;
 
 procedure TGitDiffView.ApplyTheme;
 var
   ThemingSvc: IOTAIDEThemingServices;
 begin
+  { Continua valendo para a moldura da janela (título, borda); o miolo é a
+    página. }
   if Supports(BorlandIDEServices, IOTAIDEThemingServices, ThemingSvc) then
     if ThemingSvc.IDEThemingEnabled then
       ThemingSvc.ApplyTheme(Self);
 end;
 
-procedure TGitDiffView.btnCloseClick(Sender: TObject);
+procedure TGitDiffView.HostDocumentReady(ASender: TObject);
 begin
-  Close;
+  PushDiff;
+end;
+
+procedure TGitDiffView.PushDiff;
+var
+  LJson: TJSONObject;
+begin
+  LJson := TJSONObject.Create;
+  try
+    LJson.AddPair('file', FFileName);
+    LJson.AddPair('diff', FDiffText);
+    FHost.CallJs('gitDiff', LJson.ToJSON);
+  finally
+    LJson.Free;
+  end;
+end;
+
+procedure TGitDiffView.HandleAction(AAction: TJSONObject);
+var
+  LType : string;
+  LValue: TJSONValue;
+begin
+  LType  := '';
+  LValue := AAction.GetValue('type');
+  if Assigned(LValue) then
+    LType := LValue.Value;
+
+  if LType = 'close' then
+    Close
+  else if LType = 'copy' then
+  begin
+    { Botão "Copiar": o JS decide o que vai (seleção, ou o diff inteiro quando
+      não há seleção) e deposita em #copyBuffer. }
+    FHost.CallJs('gitCopySelection', '{}');
+  end;
 end;
 
 end.

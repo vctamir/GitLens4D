@@ -36,8 +36,9 @@ type
     FMessenger  : IIDEMessenger;
 
     // Componentes visuais/IDE (owned, não são interfaces)
-    FMenu   : TGitLensMenu;
-    FTracker: TGitLensCursorTracker;
+    FMenu      : TGitLensMenu;
+    FEditorMenu: TGitLensEditorMenu;
+    FTracker   : TGitLensCursorTracker;
 
     // ── Callbacks injetados nos componentes filhos ─────────────────────
     procedure OnEditorToggle(ANewState: Boolean);
@@ -47,7 +48,6 @@ type
     procedure OnSettingsAction;
     procedure OnCursorChanged(const AFile: string; ALine: Integer);
     function OnIsActive: Boolean;
-    procedure OnKeyShortcut;
 
     // ── Helpers internos ──────────────────────────────────────────────
     function IsDebugging: Boolean;
@@ -95,7 +95,8 @@ uses
 
 constructor TGitLens4D.Create;
 var
-  PathResolver: IGitPathResolver;
+  PathResolver         : IGitPathResolver;
+  LHist, LChanges, LTag: string;
 begin
   inherited Create;
   FLastLine   := -1;
@@ -119,12 +120,25 @@ begin
   RegisterStatusWindow(FStatusProv, FRunner, FSettings, FAIService);
 
   // ── Componentes do IDE ───────────────────────────────────────────────
+  FSettings.LoadGeneralConfig(LHist, LChanges, LTag);
+
   FMenu := TGitLensMenu.Create(FEnabledEditor, FEnabledDebug,
     OnEditorToggle,
     OnDebugToggle,
     OnHistoryAction,
     OnStatusAction,
-    OnSettingsAction);
+    OnSettingsAction,
+    LHist, LChanges);
+
+  { As mesmas ações no botão direito do editor -- é lá que se está quando se
+    quer perguntar sobre uma linha. }
+  FEditorMenu := TGitLensEditorMenu.Create(
+    OnHistoryAction,
+    OnStatusAction,
+    OnSettingsAction,
+    OnEditorToggle,
+    FEnabledEditor,
+    LHist, LChanges);
 
   FTracker := TGitLensCursorTracker.Create(OnCursorChanged, OnIsActive);
 
@@ -136,6 +150,7 @@ var
   KeySvc: IOTAKeyboardServices;
 begin
   FTracker.Free;
+  FEditorMenu.Free;
   FMenu.Free;
 
   if FKeyBindIdx > 0 then
@@ -161,6 +176,13 @@ begin
     FSettings.LoadGeneralConfig(LHist, LChanges, LTag);
     FKeyBindIdx := KeySvc.AddKeyboardBinding(
       TGitLensKeyboardBinding.Create(OnHistoryAction, OnStatusAction, LHist, LChanges));
+
+    { As legendas dos menus mostram o atalho: trocar um sem o outro faria os
+      menus mentirem sobre qual tecla usar. }
+    if Assigned(FMenu) then
+      FMenu.SyncShortcuts(LHist, LChanges);
+    if Assigned(FEditorMenu) then
+      FEditorMenu.SyncShortcuts(LHist, LChanges);
   end;
 end;
 
@@ -245,6 +267,11 @@ procedure TGitLens4D.OnEditorToggle(ANewState: Boolean);
 begin
   FEnabledEditor := ANewState;
   FSettings.Save(FEnabledEditor, FEnabledDebug);
+  { O estado é um só: marcar num menu tem de aparecer no outro. }
+  if Assigned(FMenu) then
+    FMenu.SyncEditorState(ANewState);
+  if Assigned(FEditorMenu) then
+    FEditorMenu.SyncEditorState(ANewState);
   if FEnabledEditor then
     FTracker.Reset
   else if not IsDebugging then
@@ -261,10 +288,40 @@ begin
     FMessenger.Hide;
 end;
 
+{ ============================================================================
+  Histórico da linha (Ctrl+Shift+H, menu View e menu de contexto)
+
+  Lê o cursor AO VIVO, e não o último visto pelo rastreador.
+
+  O que quebrava: FLastFile/FLastLine só são preenchidos por OnCursorChanged, e
+  o rastreador desiste antes disso quando o blame está desligado
+  (TGitLensCursorTracker consulta OnIsActive e sai). Ou seja: com "Ativo no
+  Editor" desmarcado -- que é o estado normal de quem não quer a linha de blame
+  a cada movimento do cursor -- o atalho virava um no-op SILENCIOSO.
+
+  O cache continua servindo de reserva: se a consulta ao editor falhar, o
+  último ponto conhecido ainda é melhor que nada.
+  ============================================================================ }
 procedure TGitLens4D.OnHistoryAction;
+var
+  LFile: string;
+  LLine: Integer;
 begin
+  if GetCurrentCursorInfo(LFile, LLine) and (LFile <> '') and (LLine > 0) then
+  begin
+    ShowGitHistory(LFile, LLine);
+    Exit;
+  end;
+
   if (FLastFile <> '') and (FLastLine > 0) then
+  begin
     ShowGitHistory(FLastFile, FLastLine);
+    Exit;
+  end;
+
+  { Falhar em silêncio foi justamente o sintoma reportado. }
+  FMessenger.ShowMessage('GitLens4D: abra uma unit no editor e posicione o cursor ' +
+    'na linha para ver o histórico.');
 end;
 
 procedure TGitLens4D.OnStatusAction;
@@ -281,15 +338,6 @@ end;
 procedure TGitShortcutSyncProc(const AMessenger: IIDEMessenger; const AMsg: string);
 begin
   AMessenger.ShowMessage(AMsg);
-end;
-
-procedure TGitLens4D.OnKeyShortcut;
-var
-  AFile: string;
-  ALine: Integer;
-begin
-  if GetCurrentCursorInfo(AFile, ALine) then
-    ShowGitHistory(AFile, ALine);
 end;
 
 // ── Lógica principal: Blame em tempo real ────────────────────────────────
@@ -376,7 +424,7 @@ begin
           if Length(LHistory) > 0 then
             ShowHistoryWindow(LFile, LLine, LHistory)
           else
-            ShowMessage(UTF8ToString('Nenhum histórico encontrado para esta linha.'));
+            ShowMessage('Nenhum histórico encontrado para esta linha.');
         end);
     end).Start;
 end;

@@ -131,6 +131,7 @@
         <DCCReference Include="src\GitLens4D.Git.ProjectProvider.pas"/>
         <DCCReference Include="src\GitLens4D.Git.StatusParser.pas"/>
         <DCCReference Include="src\GitLens4D.Git.StatusProvider.pas"/>
+        <DCCReference Include="src\GitLens4D.IDE.WebHost.pas"/>
         <DCCReference Include="src\GitLens4D.IDE.CursorTracker.pas"/>
         <DCCReference Include="src\GitLens4D.IDE.KeyBinding.pas"/>
         <DCCReference Include="src\GitLens4D.IDE.Menu.pas"/>

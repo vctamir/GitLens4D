@@ -13,6 +13,7 @@ interface
 uses
   System.Classes,
   System.SysUtils,
+  System.StrUtils, // ContainsText/EndsText, usados na rede de segurança do tipo
   System.Net.HttpClient,
   System.Net.URLClient,
   System.JSON,
@@ -25,6 +26,9 @@ type
     function CallChatAPI(const AEndpoint, AKey, AModel, LSystem, LUser: string; ATemp: Double; AMaxTokens: Integer): string;
     function CallOllamaLegacy(const AEndpoint, AModel, APrompt: string; ATemp: Double; AMaxTokens: Integer): string;
     function NormalizeResponse(const AResponse: string): string;
+    { Rede de segurança para o tipo do commit -- ver a implementação. }
+    function InferTypeFromDiff(const ADiff: string): string;
+    function EnforceCommitType(const AText, ADiff: string): string;
   public
     constructor Create(ASettings: ISettingsRepository);
     function GenerateCommitMessage(const ATaskNum, ATaskDesc, ADiff, AProjName, AProjVer: string): string;
@@ -53,6 +57,133 @@ begin
   begin
     FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
     Result := LEndpoint.Trim <> '';
+  end;
+end;
+
+{ ============================================================================
+  Rede de segurança do tipo do commit
+
+  Prompt não é contrato: por melhor que seja a instrução, um modelo pequeno
+  ainda devolve o placeholder de vez em quando -- foi o que aconteceu, e o
+  usuário via '[TIPO]:' no começo da mensagem. Aqui isso é consertado sem
+  perguntar nada a ninguém: se o texto ainda tem placeholder, ele é trocado por
+  um tipo deduzido do próprio Diff.
+
+  A dedução é grosseira de propósito. Ela não tenta acertar sempre -- tenta
+  garantir que o commit NUNCA saia com um placeholder no lugar do tipo, que é o
+  único resultado inaceitável.
+  ============================================================================ }
+function TAIService.InferTypeFromDiff(const ADiff: string): string;
+var
+  LLines    : TArray<string>;
+  LLine     : string;
+  LPath     : string;
+  LHasNew   : Boolean;
+  LTouched  : Integer;
+  LDocs     : Integer;
+  LTests    : Integer;
+begin
+  LHasNew  := False;
+  LTouched := 0;
+  LDocs    := 0;
+  LTests   := 0;
+
+  LLines := ADiff.Split([sLineBreak, #10]);
+  for LLine in LLines do
+  begin
+    if LLine.StartsWith('new file mode') then
+      LHasNew := True;
+
+    { '+++ b/caminho/arquivo.ext' é a linha que nomeia o arquivo destino. }
+    if LLine.StartsWith('+++ b/') then
+    begin
+      LPath := LowerCase(Copy(LLine, Length('+++ b/') + 1, MaxInt)).Trim;
+      if LPath = '' then
+        Continue;
+      Inc(LTouched);
+      if EndsText('.md', LPath) or EndsText('.txt', LPath) or ContainsText(LPath, '/docs/') then
+        Inc(LDocs);
+      if ContainsText(LPath, 'test') or ContainsText(LPath, 'spec') then
+        Inc(LTests);
+    end;
+  end;
+
+  if (LTouched > 0) and (LDocs = LTouched) then
+    Exit('DOCS');
+  if (LTouched > 0) and (LTests = LTouched) then
+    Exit('TEST');
+  if LHasNew then
+    Exit('FEAT');
+  { Sem pista melhor: mudança em arquivo que já existia é, na dúvida, correção. }
+  Result := 'FIX';
+end;
+
+{ Troca o placeholder pelo tipo deduzido, cobrindo as formas que já apareceram
+  na prática: [TIPO], [TYPE], <TIPO> e o TIPO: solto. Se o modelo escreveu um
+  tipo de verdade, nada aqui casa e o texto passa intacto.
+
+  As formas com delimitador são trocadas em qualquer lugar do texto: '[TIPO]'
+  não é português, é placeholder. Já o TIPO: sem colchetes só vale na PRIMEIRA
+  linha, e só no começo dela -- 'corrige o tipo: integer' no meio do resumo é
+  uma frase legítima, e trocar aquilo por 'corrige o FIX: integer' seria
+  estragar a mensagem para consertar um problema que não existe ali. }
+function TAIService.EnforceCommitType(const AText, ADiff: string): string;
+var
+  LType     : string;
+  LBreak    : Integer;
+  LFirst    : string;
+  LRest     : string;
+  LPrefixLen: Integer;
+  LTrimmed  : string;
+begin
+  Result := AText;
+  LType  := '';
+  if Result.Trim = '' then
+    Exit;
+
+  { Formas com delimitador, em qualquer posição. }
+  if ContainsText(Result, '[TIPO]') or ContainsText(Result, '<TIPO>') or
+     ContainsText(Result, '[TYPE]') then
+  begin
+    LType  := InferTypeFromDiff(ADiff);
+    Result := StringReplace(Result, '[TIPO]', LType, [rfReplaceAll, rfIgnoreCase]);
+    Result := StringReplace(Result, '<TIPO>', LType, [rfReplaceAll, rfIgnoreCase]);
+    Result := StringReplace(Result, '[TYPE]', LType, [rfReplaceAll, rfIgnoreCase]);
+  end;
+
+  { TIPO: solto -- só no início da primeira linha, tolerando o '## ' do
+    Markdown e espaços à esquerda. }
+  LBreak := Pos(sLineBreak, Result);
+  if LBreak > 0 then
+  begin
+    LFirst := Copy(Result, 1, LBreak - 1);
+    LRest  := Copy(Result, LBreak, MaxInt);
+  end
+  else
+  begin
+    LFirst := Result;
+    LRest  := '';
+  end;
+
+  LTrimmed   := TrimLeft(LFirst);
+  LPrefixLen := Length(LFirst) - Length(LTrimmed);
+  while StartsText('#', LTrimmed) do
+  begin
+    LTrimmed := Copy(LTrimmed, 2, MaxInt);
+    Inc(LPrefixLen);
+  end;
+  while StartsText(' ', LTrimmed) do
+  begin
+    LTrimmed := Copy(LTrimmed, 2, MaxInt);
+    Inc(LPrefixLen);
+  end;
+
+  if StartsText('TIPO:', LTrimmed) then
+  begin
+    if LType = '' then
+      LType := InferTypeFromDiff(ADiff);
+    Result := Copy(LFirst, 1, LPrefixLen) + LType +
+      Copy(LTrimmed, Length('TIPO') + 1, MaxInt) + LRest;
   end;
 end;
 
@@ -116,7 +247,8 @@ begin
     'REGRAS DE OURO (cumprimento obrigatório, sem exceção):' + sLineBreak +
     '1. Responda APENAS o texto do commit e o resumo técnico. Nenhum texto antes ou depois.' + sLineBreak +
     LFormatRule + sLineBreak +
-    '3. O campo [TIPO] deve ser substituído por EXATAMENTE um destes valores, sempre em maiúsculas: FEAT, FIX, DOCS, REFACTOR, STYLE, TEST, PERF, CHORE. Escolha o tipo SOMENTE com base no conteúdo do Diff, nunca com base na descrição da task.' + sLineBreak +
+    '3. A resposta COMEÇA pelo tipo da mudança, em maiúsculas, colado nos dois-pontos. Use EXATAMENTE um destes: FEAT, FIX, DOCS, REFACTOR, STYLE, TEST, PERF, CHORE. Escolha SOMENTE pelo conteúdo do Diff, nunca pela descrição da task.' + sLineBreak +
+    '   NUNCA escreva a palavra TIPO, e NUNCA coloque colchetes em volta do tipo: escreva o tipo escolhido, como em FEAT: ou FIX:.' + sLineBreak +
     '4. O número da task e a descrição da task fornecidos em "DADOS PARA GERAÇÃO" são fixos: copie-os EXATAMENTE como estão. PROIBIDO inventar, alterar, traduzir, resumir ou trocar a ordem desses dois valores.';
 
   if LExtraTag <> '' then
@@ -127,16 +259,21 @@ begin
   if LExtraTag <> '' then
     LSystem := LSystem + LExtraTag + sLineBreak;
 
-  LSystem := LSystem + LH2 + '[TIPO]:[#000 - Descrição de exemplo da task] - Resumo geral do commit';
+  { O exemplo vem PREENCHIDO (FEAT) de propósito. Com um placeholder literal no
+    lugar -- era '[TIPO]' --, modelos menores copiavam o placeholder para a
+    resposta em vez de escolher um tipo, e a mensagem chegava ao usuário com
+    '[TIPO]:' no começo. Um valor concreto não tem como ser copiado errado: se
+    for copiado, ainda assim é um tipo válido. }
+  LSystem := LSystem + LH2 + 'FEAT:[#000 - Descrição de exemplo da task] - Resumo geral do commit';
 
   LUser := 'DADOS PARA GERAÇÃO (use estes valores exatamente, não invente outros):' + sLineBreak +
     '- Task Number: ' + ATaskNum + sLineBreak +
     '- Task Description: ' + ATaskDesc + sLineBreak +
     '- Diff: ' + ADiff + sLineBreak + sLineBreak +
-    'ESTRUTURA OBRIGATÓRIA DA RESPOSTA (substitua apenas [TIPO]; mantenha #' + ATaskNum + ' - ' + ATaskDesc + ' EXATAMENTE como informado acima):' + sLineBreak;
+    'ESTRUTURA OBRIGATÓRIA DA RESPOSTA (comece pelo tipo escolhido no lugar de FEAT; mantenha #' + ATaskNum + ' - ' + ATaskDesc + ' EXATAMENTE como informado acima):' + sLineBreak;
   if LExtraTag <> '' then
     LUser := LUser + LExtraTag + sLineBreak;
-  LUser   := LUser + LH2 + '[TIPO]:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
+  LUser   := LUser + LH2 + 'FEAT:[#' + ATaskNum + ' - ' + ATaskDesc + '] - Resumo geral do commit' + sLineBreak +
     LH3 + '[VERSAO] ' + AProjName + ' v. ' + AProjVer + sLineBreak +
     sLineBreak +
     LH3 + 'Detalhamento por arquivo' + sLineBreak +
@@ -150,7 +287,7 @@ begin
     else
       LResponse := CallChatAPI(LEndpoint, LKey, LModel, LSystem, LUser, LTemp, LMaxTokens);
 
-    Result := NormalizeResponse(LResponse);
+    Result := EnforceCommitType(NormalizeResponse(LResponse), ADiff);
   except
     on E: Exception do
       Result := Format('Erro de Conexão: %s', [E.Message]);

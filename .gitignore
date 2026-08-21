@@ -41,3 +41,5 @@ __recovery/
 Thumbs.db
 .DS_Store
 
+# Saida do instalador: o .exe e artefato de build, nao fonte.
+installer/dist/

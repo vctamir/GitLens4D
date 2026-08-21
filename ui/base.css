@@ -1,0 +1,211 @@
+/* ============================================================================
+   GitLens4D - base visual compartilhada por TODAS as views do plugin.
+
+   Esta folha e injetada pelo host (TGitWebHost.NavigateToHtml) no lugar do
+   marcador GITLENS_BASE_CSS (entre delimitadores de comentario) de cada pagina -- e nao por <link>, porque o
+   HTML e gravado num arquivo temporario em %TEMP% e um caminho relativo nao
+   apontaria mais para ca.
+
+   Uma folha so, e nao uma copia por tela, para que "mesmo padrao" seja uma
+   propriedade estrutural: mexer aqui muda as quatro telas de uma vez.
+
+   Restricoes do Trident (IE11), validas para tudo aqui dentro:
+     - sem CSS custom properties (var()): todas as cores por extenso;
+     - sem CSS grid; flexbox so o basico, sempre com o par -ms-;
+     - sem transition/animation (o Trident engasga em painel dockado).
+
+   Paleta: a mesma do painel do agente Claude, que por sua vez segue o tema
+   escuro da IDE.
+     fundo         #1e1e1e     superficie   #252526     campo     #2d2d30
+     borda         #3c3c3c     borda forte  #4d4d4d
+     texto         #d4d4d4     apagado      #9a9a9a     fraco     #6a6a6a
+     destaque      #0e639c     destaque+    #1177bb     selecao   #094771
+     verde         #89d185     vermelho     #f48771     amarelo   #e2c08d
+   ============================================================================ */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+/* Estrutura padrao das telas: cabecalho fixo, miolo rolavel, rodape fixo. */
+.page {
+  display: flex;
+  display: -ms-flexbox;
+  flex-direction: column;
+  -ms-flex-direction: column;
+  height: 100%;
+}
+.page > .head,
+.page > .foot {
+  flex: 0 0 auto;
+  -ms-flex: 0 0 auto;
+  padding: 6px 8px;
+  background: #252526;
+  white-space: nowrap;
+}
+.page > .head { border-bottom: 1px solid #3c3c3c; }
+.page > .foot { border-top: 1px solid #3c3c3c; }
+.page > .body {
+  flex: 1 1 auto;
+  -ms-flex: 1 1 auto;
+  overflow: auto;
+  min-height: 0; /* sem isto o filho com overflow estoura o flex no IE */
+}
+
+/* ---------- tipografia auxiliar ---------- */
+.mono {
+  font-family: Consolas, "Courier New", monospace;
+}
+.k {
+  color: #9a9a9a;
+  font-size: 11px;
+  padding-right: 5px;
+}
+.muted { color: #6a6a6a; }
+.right { float: right; }
+.gap   { display: inline-block; width: 4px; }
+.empty {
+  color: #6a6a6a;
+  font-style: italic;
+  padding: 14px 10px;
+}
+h2.section {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #9a9a9a;
+  font-weight: 600;
+}
+
+/* ---------- controles ---------- */
+button {
+  background: #333333;
+  color: #d4d4d4;
+  border: 1px solid #4d4d4d;
+  padding: 3px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+}
+button:hover    { background: #3d3d3d; }
+button:disabled { color: #6a6a6a; cursor: default; background: #2a2a2a; }
+button.primary {
+  background: #0e639c;
+  border-color: #1177bb;
+  color: #ffffff;
+}
+button.primary:hover    { background: #1177bb; }
+button.primary:disabled { background: #2a2a2a; border-color: #4d4d4d; color: #6a6a6a; }
+button.icon {
+  padding: 3px 7px;
+  font-size: 12px;
+  line-height: 12px;
+}
+
+input[type=text], input[type=password], input[type=number], textarea, select {
+  background: #2d2d30;
+  color: #d4d4d4;
+  border: 1px solid #4d4d4d;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 5px;
+  box-sizing: border-box;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #1177bb;
+  outline: none;
+}
+input[type=checkbox] { vertical-align: middle; }
+label { cursor: default; }
+
+/* ---------- pills de status ---------- */
+.pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill-ok      { background: #1e3f2a; color: #89d185; }
+.pill-bad     { background: #4a1f1f; color: #f48771; }
+.pill-warn    { background: #4a3b17; color: #e2c08d; }
+.pill-info    { background: #12354f; color: #6fb3e0; }
+.pill-neutral { background: #333333; color: #a0a0a0; }
+
+/* ---------- listas ---------- */
+.row-item {
+  padding: 4px 8px;
+  border-bottom: 1px solid #2d2d2d;
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-item:hover { background: #2a2d2e; }
+.row-item.sel   { background: #094771; }
+
+/* ---------- avisos ---------- */
+.banner {
+  display: none;
+  background: #4a1f1f;
+  color: #f48771;
+  padding: 6px 8px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+}
+
+/* Ponte de texto longo com o Pascal. Fora da tela, NUNCA display:none:
+   elemento nao renderizado e terreno instavel no Trident, e o value precisa
+   continuar legivel por TGitWebHost.TryReadValue. */
+.offscreen {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+}
+
+/* ---------- pintura de diff (telas de Diff e de Historico) ----------
+   Uma linha = numero + conteudo, sem quebrar. O fundo colorido cobre a linha
+   inteira, e nao so o texto: e o que da a leitura em bloco que o TRichEdit
+   nunca deu. Pareado com ui/diff-render.js. */
+.diff {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: pre;
+  padding: 0 0 8px 0;
+}
+.dl { padding: 0 8px 0 0; }
+.dl .no {
+  display: inline-block;
+  width: 44px;
+  padding-right: 10px;
+  text-align: right;
+  color: #5a5a5a;
+  -ms-user-select: none;
+  user-select: none;
+}
+.dl-add      { background: #16301f; color: #b5e8b5; }
+.dl-add .no  { color: #4a7a55; }
+.dl-del      { background: #3a1d1d; color: #f0a9a0; }
+.dl-del .no  { color: #8a5450; }
+.dl-hunk     { background: #12354f; color: #6fb3e0; }
+.dl-hunk .no { color: #3d6f96; }
+.dl-file     { color: #9a9a9a; font-weight: 600; }
+.dl-meta     { color: #6a6a6a; }
+.stat .add   { color: #89d185; }
+.stat .del   { color: #f48771; }

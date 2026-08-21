@@ -98,7 +98,7 @@ begin
             if P2 > 0 then
               LAfter := Copy(LAfter, 1, P2 - 1);
 
-            StrAtual := UTF8ToString(Format('@@ ANTES: Linha %s | DEPOIS: Linha %s', [LBefore, LAfter]));
+            StrAtual := Format('@@ ANTES: Linha %s | DEPOIS: Linha %s', [LBefore, LAfter]);
           end;
         end;
 

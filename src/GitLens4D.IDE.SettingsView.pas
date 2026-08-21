@@ -1,5 +1,18 @@
 ﻿unit GitLens4D.IDE.SettingsView;
 
+{ ============================================================================
+  GitLens4D - Configurações (geral e IA)
+
+  Desenhada em ui\settings.html, no mesmo host das outras telas. As duas abas
+  do antigo TPageControl viraram duas seções da página; os TEdit/TComboBox
+  viraram campos HTML com os MESMOS valores possíveis de antes (Local/openAI,
+  pt-BR/en-US, Markdown/Texto Puro) -- o que é gravado no repositório de
+  configurações não mudou nada.
+
+  Não há estado nesta unit: o Pascal escreve os valores no documento ao abrir e
+  lê os mesmos ids de volta ao salvar. Um lugar só onde a informação mora.
+  ============================================================================ }
+
 interface
 
 uses
@@ -8,59 +21,32 @@ uses
   System.SysUtils,
   System.Variants,
   System.Classes,
+  System.JSON,
   Vcl.Graphics,
   Vcl.Controls,
   Vcl.Forms,
   Vcl.Dialogs,
-  Vcl.StdCtrls,
-  Vcl.ExtCtrls,
-  Vcl.ComCtrls,
   GitLens4D.Interfaces,
+  GitLens4D.IDE.WebHost,
   ToolsAPI;
 
 type
   TGitSettingsView = class(TForm)
-    pnlBottom: TPanel;
-    btnSave: TButton;
-    btnCancel: TButton;
-    pcSettings: TPageControl;
-    tsGeneral: TTabSheet;
-    tsAI: TTabSheet;
-    grpShortcuts: TGroupBox;
-    lblHist: TLabel;
-    lblChanges: TLabel;
-    edtShortcutHist: TEdit;
-    edtShortcutChanges: TEdit;
-    grpCommit: TGroupBox;
-    lblTag: TLabel;
-    edtCommitTag: TEdit;
-    lblTagHint: TLabel;
-    lblType: TLabel;
-    cbType: TComboBox;
-    lblEndpoint: TLabel;
-    edtEndpoint: TEdit;
-    lblKey: TLabel;
-    edtKey: TEdit;
-    lblModel: TLabel;
-    edtModel: TEdit;
-    lblTemp: TLabel;
-    edtTemp: TEdit;
-    lblMaxTokens: TLabel;
-    edtMaxTokens: TEdit;
-    lblLang: TLabel;
-    cbLang: TComboBox;
-    lblFormat: TLabel;
-    cbFormat: TComboBox;
-    procedure btnSaveClick(Sender: TObject);
-    procedure btnCancelClick(Sender: TObject);
   private
-    FSettings: ISettingsRepository;
-    procedure LoadConfigs;
+    FHost     : TGitWebHost;
+    FSettings : ISettingsRepository;
+    FStartOnAI: Boolean;
     procedure ApplyTheme;
+    procedure HandleAction(AAction: TJSONObject);
+    procedure HostDocumentReady(ASender: TObject);
+    procedure PushConfigs;
+    procedure SaveConfigs;
+    function Read(const AElementId, ADefault: string): string;
   protected
     procedure DoShow; override;
   public
-    constructor Create(AOwner: TComponent; ASettings: ISettingsRepository); reintroduce;
+    constructor Create(AOwner: TComponent; ASettings: ISettingsRepository;
+      AStartOnAI: Boolean); reintroduce;
   end;
 
 procedure ShowSettings(ASettings: ISettingsRepository; ADefaultAI: Boolean = False);
@@ -69,30 +55,51 @@ implementation
 
 {$R *.dfm}
 
+const
+  ID_SHORTCUT_HIST    = 'shortcutHist';
+  ID_SHORTCUT_CHANGES = 'shortcutChanges';
+  ID_COMMIT_TAG       = 'commitTag';
+  ID_AI_TYPE          = 'aiType';
+  ID_ENDPOINT         = 'endpoint';
+  ID_API_KEY          = 'apiKey';
+  ID_MODEL            = 'model';
+  ID_LANG             = 'lang';
+  ID_FORMAT           = 'format';
+  ID_TEMP             = 'temp';
+  ID_MAX_TOKENS       = 'maxTokens';
+
+  { Os mesmos defaults que o código VCL usava ao ler ItemIndex = -1. }
+  DEFAULT_AI_TYPE    = 'Local';
+  DEFAULT_LANG       = 'pt-BR';
+  DEFAULT_FORMAT     = 'Markdown';
+  DEFAULT_TEMP       = 0.7;
+  DEFAULT_MAX_TOKENS = 2048;
 
 procedure ShowSettings(ASettings: ISettingsRepository; ADefaultAI: Boolean = False);
 var
   LForm: TGitSettingsView;
 begin
-  LForm := TGitSettingsView.Create(nil, ASettings);
+  LForm := TGitSettingsView.Create(nil, ASettings, ADefaultAI);
   try
-    if ADefaultAI then
-      LForm.pcSettings.ActivePage := LForm.tsAI
-    else
-      LForm.pcSettings.ActivePage := LForm.tsGeneral;
-
     LForm.ShowModal;
   finally
     LForm.Free;
   end;
 end;
 
-constructor TGitSettingsView.Create(AOwner: TComponent; ASettings: ISettingsRepository);
+{ TGitSettingsView }
+
+constructor TGitSettingsView.Create(AOwner: TComponent; ASettings: ISettingsRepository;
+  AStartOnAI: Boolean);
 begin
   inherited Create(AOwner);
-  FSettings := ASettings;
-  LoadConfigs;
-  Self.PopupMode := pmAuto;
+  FSettings  := ASettings;
+  FStartOnAI := AStartOnAI;
+  PopupMode  := pmAuto;
+
+  FHost                 := TGitWebHost.Create(Self, Self, 'settings.html');
+  FHost.OnAction        := HandleAction;
+  FHost.OnDocumentReady := HostDocumentReady;
 end;
 
 procedure TGitSettingsView.DoShow;
@@ -110,80 +117,104 @@ begin
       LThemingSvc.ApplyTheme(Self);
 end;
 
-procedure TGitSettingsView.LoadConfigs;
+procedure TGitSettingsView.HostDocumentReady(ASender: TObject);
+begin
+  PushConfigs;
+end;
+
+procedure TGitSettingsView.PushConfigs;
 var
   LHist, LChanges, LTag                         : string;
   LType, LEndpoint, LKey, LModel, LLang, LFormat: string;
   LTemp                                         : Double;
   LMaxTokens                                    : Integer;
+  LJson                                         : TJSONObject;
 begin
-  if Assigned(FSettings) then
-  begin
-    // Geral
-    FSettings.LoadGeneralConfig(LHist, LChanges, LTag);
-    edtShortcutHist.Text    := LHist;
-    edtShortcutChanges.Text := LChanges;
-    edtCommitTag.Text       := LTag;
+  if not Assigned(FSettings) then
+    Exit;
 
-    // IA
-    FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
-    cbType.ItemIndex := cbType.Items.IndexOf(LType);
-    if cbType.ItemIndex = -1 then
-      cbType.ItemIndex := 0;
+  FSettings.LoadGeneralConfig(LHist, LChanges, LTag);
+  FSettings.LoadAIConfig(LType, LEndpoint, LKey, LModel, LLang, LFormat, LTemp, LMaxTokens);
 
-    cbLang.ItemIndex := cbLang.Items.IndexOf(LLang);
-    if cbLang.ItemIndex = -1 then
-      cbLang.ItemIndex := 0;
-
-    cbFormat.ItemIndex := cbFormat.Items.IndexOf(LFormat);
-    if cbFormat.ItemIndex = -1 then
-      cbFormat.ItemIndex := 0;
-
-    edtEndpoint.Text  := LEndpoint;
-    edtKey.Text       := LKey;
-    edtModel.Text     := LModel;
-    edtTemp.Text      := FloatToStr(LTemp);
-    edtMaxTokens.Text := IntToStr(LMaxTokens);
+  LJson := TJSONObject.Create;
+  try
+    LJson.AddPair('shortcutHist', LHist);
+    LJson.AddPair('shortcutChanges', LChanges);
+    LJson.AddPair('commitTag', LTag);
+    LJson.AddPair('aiType', LType);
+    LJson.AddPair('endpoint', LEndpoint);
+    LJson.AddPair('apiKey', LKey);
+    LJson.AddPair('model', LModel);
+    LJson.AddPair('lang', LLang);
+    LJson.AddPair('format', LFormat);
+    LJson.AddPair('temp', FloatToStr(LTemp));
+    LJson.AddPair('maxTokens', IntToStr(LMaxTokens));
+    { Abrir direto na aba de IA é o caminho de quem clicou no botão "IA" do
+      painel de commit -- ele veio configurar a IA, e não os atalhos. }
+    if FStartOnAI then
+      LJson.AddPair('tab', 'ai')
+    else
+      LJson.AddPair('tab', 'general');
+    FHost.CallJs('gitSettings', LJson.ToJSON);
+  finally
+    LJson.Free;
   end;
 end;
 
-procedure TGitSettingsView.btnSaveClick(Sender: TObject);
+{ Lê um campo do documento, caindo no default quando o elemento sumiu ou veio
+  vazio -- mesma proteção que o ItemIndex = -1 dava nos combos. }
+function TGitSettingsView.Read(const AElementId, ADefault: string): string;
+begin
+  if not FHost.TryReadValue(AElementId, Result) or (Result = '') then
+    Result := ADefault;
+end;
+
+procedure TGitSettingsView.SaveConfigs;
 var
-  LType, LLang, LFormat: string;
+  LTemp: Double;
 begin
-  if Assigned(FSettings) then
-  begin
-    // Salvar Geral
-    FSettings.SaveGeneralConfig(
-      edtShortcutHist.Text,
-      edtShortcutChanges.Text,
-      edtCommitTag.Text
-      );
+  if not Assigned(FSettings) then
+    Exit;
 
-    // Salvar IA
-    LType := 'Local';
-    if cbType.ItemIndex <> -1 then
-      LType := cbType.Items[cbType.ItemIndex];
+  FSettings.SaveGeneralConfig(
+    Read(ID_SHORTCUT_HIST, ''),
+    Read(ID_SHORTCUT_CHANGES, ''),
+    Read(ID_COMMIT_TAG, ''));
 
-    LLang := 'pt-BR';
-    if cbLang.ItemIndex <> -1 then
-      LLang := cbLang.Items[cbLang.ItemIndex];
+  { StrToFloatDef com o separador da máquina: o campo é digitado pelo usuário e
+    tanto 0.7 quanto 0,7 aparecem na prática. }
+  LTemp := StrToFloatDef(StringReplace(Read(ID_TEMP, ''), '.', FormatSettings.DecimalSeparator,
+    [rfReplaceAll]), DEFAULT_TEMP);
 
-    LFormat := 'Markdown';
-    if cbFormat.ItemIndex <> -1 then
-      LFormat := cbFormat.Items[cbFormat.ItemIndex];
-
-    FSettings.SaveAIConfig(LType, edtEndpoint.Text, edtKey.Text, edtModel.Text, LLang, LFormat,
-      StrToFloatDef(edtTemp.Text, 0.7), StrToIntDef(edtMaxTokens.Text, 2048));
-
-    ShowMessage(UTF8ToString('Configurações salvas! Reinicie o Delphi para aplicar os novos atalhos de teclado.'));
-    ModalResult := mrOk;
-  end;
+  FSettings.SaveAIConfig(
+    Read(ID_AI_TYPE, DEFAULT_AI_TYPE),
+    Read(ID_ENDPOINT, ''),
+    Read(ID_API_KEY, ''),
+    Read(ID_MODEL, ''),
+    Read(ID_LANG, DEFAULT_LANG),
+    Read(ID_FORMAT, DEFAULT_FORMAT),
+    LTemp,
+    StrToIntDef(Read(ID_MAX_TOKENS, ''), DEFAULT_MAX_TOKENS));
 end;
 
-procedure TGitSettingsView.btnCancelClick(Sender: TObject);
+procedure TGitSettingsView.HandleAction(AAction: TJSONObject);
+var
+  LType : string;
+  LValue: TJSONValue;
 begin
-  ModalResult := mrCancel;
+  LType  := '';
+  LValue := AAction.GetValue('type');
+  if Assigned(LValue) then
+    LType := LValue.Value;
+
+  if LType = 'save' then
+  begin
+    SaveConfigs;
+    ShowMessage('Configurações salvas! Reinicie o Delphi para aplicar os novos atalhos de teclado.');
+    ModalResult := mrOk;
+  end
+  else if LType = 'cancel' then
+    ModalResult := mrCancel;
 end;
 
 end.

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>GitLens4D - Diff</title>
+<script>
+// Ver o comentario equivalente em status.html: erro de script nao pode virar
+// MessageBox modal na thread da IDE.
+window.onerror = function (msg, url, line) {
+  try {
+    var el = document.getElementById('bootError');
+    if (el) {
+      el.style.display = 'block';
+      el.innerHTML = 'Erro de script: ' + String(msg) + ' (linha ' + String(line) + ')';
+    }
+  } catch (e) {}
+  return true;
+};
+</script>
+<style>
+/*GITLENS_BASE_CSS*/
+
+/* ---------- especifico da tela de Diff ---------- */
+#fileName { color: #e6e6e6; font-family: Consolas, "Courier New", monospace; }
+#stat { padding-left: 8px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="app" class="page">
+  <div id="bootError" class="banner"></div>
+
+  <div class="head">
+    <span class="k">Arquivo</span><span id="fileName"></span>
+    <span id="stat" class="stat"></span>
+    <span class="right">
+      <button onclick="send({type:'copy'});" title="Copiar o diff inteiro">Copiar</button>
+      <span class="gap"></span>
+      <button class="primary" onclick="send({type:'close'});">Fechar</button>
+    </span>
+  </div>
+
+  <div class="body">
+    <div id="diff" class="diff"></div>
+  </div>
+
+  <textarea id="copyBuffer" class="offscreen" tabindex="-1" aria-hidden="true"></textarea>
+</div>
+
+<script>
+function send(obj) {
+  try {
+    window.location.href = 'gitlens4d://action?data=' + encodeURIComponent(JSON.stringify(obj));
+  } catch (e) {}
+}
+
+function el(id) { return document.getElementById(id); }
+
+function escapeHtml(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/*GITLENS_DIFF_JS*/
+
+var rawDiff = '';
+
+// ---------------------------------------------- chamado a partir do Pascal
+function gitDiff(json) {
+  try {
+    var data = JSON.parse(json);
+    rawDiff = data.diff || '';
+    el('fileName').innerHTML = escapeHtml(data.file || '');
+    el('stat').innerHTML = diffStatHtml(renderDiffInto(el('diff'), rawDiff));
+  } catch (e) {
+    var box = el('bootError');
+    if (box) {
+      box.style.display = 'block';
+      box.innerHTML = 'Falha ao renderizar o diff: ' + escapeHtml(e.message || e);
+    }
+  }
+}
+
+// O Pascal pede a copia por aqui para reaproveitar a mesma ponte do painel:
+// o texto vai pelo DOM, nunca pela URL.
+function gitCopySelection() {
+  var text = '';
+  try {
+    if (window.getSelection) { text = String(window.getSelection()); }
+  } catch (e) {}
+  if (!text) { text = rawDiff; }
+  el('copyBuffer').value = text;
+  send({ type: 'clipboard.copy' });
+}
+
+function onKeyDown(e) {
+  var ev = e || window.event;
+  var key = ev.keyCode || ev.which;
+
+  if (key === 27) { send({ type: 'close' }); return false; }
+
+  if ((ev.ctrlKey || ev.metaKey) && (key === 67 || key === 45)) {
+    gitCopySelection();
+    if (ev.preventDefault) { ev.preventDefault(); } else { ev.returnValue = false; }
+    return false;
+  }
+  return true;
+}
+
+function onReady() {
+  if (document.addEventListener) {
+    document.addEventListener('keydown', onKeyDown, false);
+  } else if (document.attachEvent) {
+    document.attachEvent('onkeydown', onKeyDown);
+  }
+  send({ type: 'ready' });
+}
+
+if (document.addEventListener) {
+  document.addEventListener('DOMContentLoaded', onReady, false);
+} else {
+  window.attachEvent('onload', onReady);
+}
+</script>
+</body>
+</html>

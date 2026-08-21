@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>GitLens4D</title>
+<script>
+// Captador de erros de script. BLOCO SEPARADO, e no <head>, de proposito:
+//
+//  - Separado porque um erro de SINTAXE cancela o bloco inteiro em que ele
+//    esta. Se o handler morasse junto com o resto do JS, um HTML truncado
+//    levaria o handler embora justamente na hora em que ele importa.
+//  - No <head> porque so protege o que vem depois dele.
+//
+// Devolver true impede o MSHTML de abrir a caixa de "erro de script" -- um
+// MessageBox MODAL na main thread da IDE, a MESMA que compila.
+window.onerror = function (msg, url, line, col, err) {
+  try {
+    var el = document.getElementById('bootError');
+    if (el) {
+      el.style.display = 'block';
+      el.innerHTML = 'Erro de script: ' + String(msg) + ' (linha ' + String(line) + ')';
+    }
+  } catch (e) {}
+  return true;
+};
+</script>
+<style>
+/*GITLENS_BASE_CSS*/
+
+/* ---------- especifico da tela de Git Changes ---------- */
+
+/* barra de branch */
+#branchBar .label { color: #9a9a9a; font-size: 11px; padding-right: 6px; }
+#branchSelect { max-width: 220px; min-width: 120px; }
+
+/* cabecalho da lista */
+#filesHeader {
+  flex: 0 0 auto;
+  -ms-flex: 0 0 auto;
+  padding: 5px 8px;
+  border-bottom: 1px solid #3c3c3c;
+  color: #9a9a9a;
+  font-size: 11px;
+}
+#filesHeader .count { color: #6a6a6a; padding-left: 6px; }
+
+/* linhas de arquivo (herdam .row-item da base) */
+.file input { margin: 0 6px 0 0; }
+.file .name { color: #e6e6e6; font-family: Consolas, "Courier New", monospace; }
+.file .path {
+  color: #6a6a6a;
+  font-size: 11px;
+  padding-left: 6px;
+  font-family: Consolas, "Courier New", monospace;
+}
+.file .staged { color: #89d185; font-size: 10px; padding-left: 6px; }
+.file .acts { float: right; visibility: hidden; }
+.file:hover .acts, .file.sel .acts { visibility: visible; }
+.file .acts button { padding: 0 6px; font-size: 10px; margin-left: 3px; }
+
+/* composer de commit */
+#composerResizer {
+  flex: 0 0 auto;
+  -ms-flex: 0 0 auto;
+  height: 5px;
+  cursor: n-resize;
+  background: #2d2d30;
+  border-top: 1px solid #3c3c3c;
+  border-bottom: 1px solid #333333;
+}
+#composerResizer:hover { background: #3d3d42; }
+#composer .line { padding-bottom: 5px; white-space: nowrap; }
+#taskNum { width: 74px; }
+#taskDesc { width: 40%; min-width: 120px; }
+#formatSelect { min-width: 118px; }
+#commitMsg {
+  width: 100%;
+  height: 84px;
+  resize: none;
+  font-family: Consolas, "Courier New", monospace;
+  line-height: 16px;
+  display: block;
+}
+#composer .hint { color: #6a6a6a; font-size: 10px; padding-top: 5px; display: inline-block; }
+</style>
+</head>
+<body>
+<div id="app" class="page">
+  <div id="bootError" class="banner"></div>
+
+  <div id="branchBar" class="head">
+    <span class="label">Branch</span>
+    <select id="branchSelect" onchange="onBranchChange();"></select>
+    <span class="gap"></span>
+    <button class="icon" title="Atualizar (F5)" onclick="send({type:'refresh'});">&#8635;</button>
+    <span class="right">
+      <button onclick="send({type:'branch.new'});">Nova branch</button>
+      <span class="gap"></span>
+      <button onclick="send({type:'pull'});">Pull</button>
+      <span class="gap"></span>
+      <button id="btnPush" onclick="send({type:'push'});">Push</button>
+      <span class="gap"></span>
+      <button onclick="send({type:'pr'});">PR</button>
+    </span>
+  </div>
+
+  <div id="filesHeader">
+    <label><input type="checkbox" id="chkAll" onclick="onSelectAll();"> marcar todos</label>
+    <span class="count" id="filesCount"></span>
+    <span class="right" id="selectedCount"></span>
+  </div>
+
+  <div id="filesRegion" class="body">
+    <div id="filesEmpty" class="empty">Nenhuma alteracao pendente.</div>
+    <div id="filesList"></div>
+  </div>
+
+  <div id="composerResizer" title="Arraste para mudar a altura"></div>
+
+  <div id="composer" class="foot">
+    <div class="line">
+      <span class="k">Tarefa</span>
+      <input type="text" id="taskNum" onchange="saveState();">
+      <span class="k" style="padding-left:8px;">Descricao</span>
+      <input type="text" id="taskDesc" onchange="saveState();">
+      <span class="right">
+        <button onclick="send({type:'config'});" title="Configurar IA">IA</button>
+      </span>
+    </div>
+
+    <textarea id="commitMsg" spellcheck="false"
+      placeholder="Mensagem do commit... (Ctrl+Enter comita)"
+      onchange="saveState();"></textarea>
+
+    <div class="line" style="padding-top:6px;padding-bottom:0;">
+      <span class="k">Formato</span>
+      <select id="formatSelect" onchange="onFormatChange();"></select>
+      <span class="gap"></span>
+      <button id="btnSuggest" onclick="send({type:'suggest'});">Sugerir IA</button>
+      <span class="gap"></span>
+      <button onclick="send({type:'copy'});" title="Copiar a mensagem">Copiar</button>
+      <span class="right">
+        <button id="btnCommit" class="primary" onclick="doCommit();">Commit</button>
+      </span>
+    </div>
+    <span class="hint" id="composerHint">Ctrl+Enter comita &middot; duplo clique num arquivo abre o diff</span>
+  </div>
+
+  <!-- Pontes de texto longo: o Pascal le estes values direto do DOM, porque a
+       URL sentinela e truncada pelo Trident sem aviso. -->
+  <textarea id="selectedFiles" class="offscreen" tabindex="-1" aria-hidden="true"></textarea>
+  <textarea id="copyBuffer" class="offscreen" tabindex="-1" aria-hidden="true"></textarea>
+</div>
+
+<script>
+// ============================================================================
+// Ponte JS -> Pascal
+//
+// Navegacao para um esquema que nao existe; o Pascal cancela no
+// BeforeNavigate2 e le o payload. Texto longo NAO vem por aqui (o Trident
+// trunca URL sem avisar) -- vai pelo value de um elemento, que o Pascal le
+// pelo DOM. Ver TGitWebHost.TryReadValue.
+// ============================================================================
+function send(obj) {
+  try {
+    window.location.href = 'gitlens4d://action?data=' + encodeURIComponent(JSON.stringify(obj));
+  } catch (e) {}
+}
+
+// Estado espelhado do lado Pascal. O Pascal e a fonte da verdade: este objeto
+// so existe para redesenhar sem perguntar de novo.
+var state = {
+  branches: [],
+  currentBranch: '',
+  ahead: 0,
+  files: [],
+  formats: [],
+  format: '',
+  taskNum: '',
+  taskDesc: '',
+  commitMsg: '',
+  busy: false
+};
+var selectedIndex = -1;
+
+function el(id) { return document.getElementById(id); }
+
+function escapeHtml(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function statusPill(status) {
+  var kind = 'pill-neutral';
+  if (status === 'Modified') { kind = 'pill-warn'; }
+  else if (status === 'Added') { kind = 'pill-ok'; }
+  else if (status === 'Deleted') { kind = 'pill-bad'; }
+  else if (status === 'Untracked') { kind = 'pill-info'; }
+  else if (status === 'Renamed') { kind = 'pill-info'; }
+  return '<span class="pill ' + kind + '">' + escapeHtml(status) + '</span>';
+}
+
+// ---------------------------------------------------------------- render ---
+function renderBranches() {
+  var sel = el('branchSelect');
+  var html = '';
+  var i;
+  for (i = 0; i < state.branches.length; i++) {
+    html += '<option value="' + escapeHtml(state.branches[i]) + '">' +
+            escapeHtml(state.branches[i]) + '</option>';
+  }
+  sel.innerHTML = html;
+  sel.value = state.currentBranch;
+
+  el('btnPush').innerHTML = state.ahead > 0 ? ('Push (' + state.ahead + ')') : 'Push';
+}
+
+function renderFiles() {
+  var list = el('filesList');
+  var html = '';
+  var i, f, checked, cls;
+
+  for (i = 0; i < state.files.length; i++) {
+    f = state.files[i];
+    checked = f.checked ? ' checked' : '';
+    cls = 'row-item file' + (i === selectedIndex ? ' sel' : '');
+    html +=
+      '<div class="' + cls + '" id="row-' + i + '" onclick="selectRow(' + i + ');"' +
+        ' ondblclick="send({type:\'file.diff\', file: ' + jsStr(f.file) + '});">' +
+        '<input type="checkbox" id="chk-' + i + '"' + checked +
+          ' onclick="onCheck(' + i + ', event);">' +
+        '<span class="name">' + escapeHtml(f.name) + '</span>' +
+        '<span class="path">' + escapeHtml(f.path) + '</span>' +
+        (f.staged ? '<span class="staged">staged</span>' : '') +
+        '<span class="acts">' +
+          '<button onclick="rowAction(event, \'file.diff\', ' + i + ');">diff</button>' +
+          '<button onclick="rowAction(event, \'file.discard\', ' + i + ');">descartar</button>' +
+        '</span>' +
+        '<span class="right" style="padding-right:8px;">' + statusPill(f.status) + '</span>' +
+      '</div>';
+  }
+
+  list.innerHTML = html;
+  el('filesEmpty').style.display = state.files.length === 0 ? 'block' : 'none';
+  el('filesCount').innerHTML = state.files.length === 1
+    ? '1 arquivo' : (state.files.length + ' arquivos');
+  updateSelectedCount();
+}
+
+// JSON.stringify de uma string, para embutir com seguranca dentro do atributo
+// onclick (aspas e barras invertidas ja saem escapadas).
+function jsStr(s) {
+  return escapeHtml(JSON.stringify(String(s === null || s === undefined ? '' : s)));
+}
+
+function renderComposer() {
+  el('taskNum').value = state.taskNum || '';
+  el('taskDesc').value = state.taskDesc || '';
+  el('commitMsg').value = state.commitMsg || '';
+
+  var sel = el('formatSelect');
+  var html = '';
+  var i;
+  for (i = 0; i < state.formats.length; i++) {
+    html += '<option value="' + escapeHtml(state.formats[i]) + '">' +
+            escapeHtml(state.formats[i]) + '</option>';
+  }
+  sel.innerHTML = html;
+  if (state.format) { sel.value = state.format; }
+
+  setBusy(state.busy);
+}
+
+function setBusy(busy) {
+  state.busy = !!busy;
+  var b = el('btnSuggest');
+  b.disabled = state.busy;
+  b.innerHTML = state.busy ? 'Pensando...' : 'Sugerir IA';
+}
+
+function updateSelectedCount() {
+  var i, n = 0;
+  for (i = 0; i < state.files.length; i++) {
+    if (state.files[i].checked) { n++; }
+  }
+  el('selectedCount').innerHTML = n > 0
+    ? (n + ' marcado' + (n > 1 ? 's' : '')) : '';
+  el('chkAll').checked = (n > 0 && n === state.files.length);
+  syncSelectedFiles();
+}
+
+// Escreve a lista de marcados no textarea que o Pascal le (um caminho por
+// linha). E o que o commit e o "salvar selecao" consomem.
+function syncSelectedFiles() {
+  var i, out = [];
+  for (i = 0; i < state.files.length; i++) {
+    if (state.files[i].checked) { out.push(state.files[i].file); }
+  }
+  el('selectedFiles').value = out.join('\n');
+}
+
+// ----------------------------------------------------------- interacoes ---
+function selectRow(i) {
+  var prev = el('row-' + selectedIndex);
+  if (prev) { prev.className = 'row-item file'; }
+  selectedIndex = i;
+  var row = el('row-' + i);
+  if (row) { row.className = 'row-item file sel'; }
+}
+
+function onCheck(i, ev) {
+  var box = el('chk-' + i);
+  if (box && state.files[i]) { state.files[i].checked = !!box.checked; }
+  updateSelectedCount();
+  send({ type: 'selection.changed' });
+  // Marcar nao deve arrastar a selecao da linha junto.
+  if (ev) {
+    if (ev.stopPropagation) { ev.stopPropagation(); } else { ev.cancelBubble = true; }
+  }
+}
+
+function onSelectAll() {
+  var on = el('chkAll').checked;
+  var i;
+  for (i = 0; i < state.files.length; i++) {
+    state.files[i].checked = on;
+    var box = el('chk-' + i);
+    if (box) { box.checked = on; }
+  }
+  updateSelectedCount();
+  send({ type: 'selection.changed' });
+}
+
+function rowAction(ev, type, i) {
+  if (ev) {
+    if (ev.stopPropagation) { ev.stopPropagation(); } else { ev.cancelBubble = true; }
+  }
+  selectRow(i);
+  if (state.files[i]) {
+    send({ type: type, file: state.files[i].file });
+  }
+  return false;
+}
+
+function onBranchChange() {
+  var name = el('branchSelect').value;
+  if (name && name !== state.currentBranch) {
+    send({ type: 'branch.change', name: name });
+  }
+}
+
+function onFormatChange() {
+  state.format = el('formatSelect').value;
+  send({ type: 'format.change', format: state.format });
+}
+
+// O Pascal le taskNum/taskDesc/commitMsg do DOM; a acao so avisa que e hora
+// de persistir.
+function saveState() {
+  send({ type: 'state.save' });
+}
+
+function doCommit() {
+  syncSelectedFiles();
+  send({ type: 'commit' });
+}
+
+// ------------------------------------------------ chamado a partir do Pascal
+function gitUpdate(json) {
+  try {
+    var incoming = JSON.parse(json);
+    state = incoming;
+    if (!state.files) { state.files = []; }
+    if (!state.branches) { state.branches = []; }
+    if (!state.formats) { state.formats = []; }
+    selectedIndex = -1;
+    renderBranches();
+    renderFiles();
+    renderComposer();
+  } catch (e) {
+    var box = el('bootError');
+    if (box) {
+      box.style.display = 'block';
+      box.innerHTML = 'Falha ao aplicar estado: ' + escapeHtml(e.message || e);
+    }
+  }
+}
+
+// Atualiza SO a mensagem -- usado pela sugestao da IA, que chega depois e nao
+// pode redesenhar a lista nem roubar o foco do que o usuario estiver fazendo.
+function gitCommitMsg(json) {
+  try {
+    var data = JSON.parse(json);
+    state.commitMsg = data.text || '';
+    el('commitMsg').value = state.commitMsg;
+    if (data.busy !== undefined) { setBusy(data.busy); }
+  } catch (e) {}
+}
+
+function gitBusy(json) {
+  try {
+    setBusy(JSON.parse(json).busy);
+  } catch (e) {}
+}
+
+// ------------------------------------------------------------- teclado ---
+// Mesma historia do painel do agente: dentro do TWebBrowser hospedado na IDE o
+// keydown CHEGA ao JS, mas a acao padrao do Trident depois dele nao acontece.
+// Por isso Ctrl+C e tratado aqui e a copia vai para o Pascal, que tem acesso
+// de verdade a area de transferencia.
+function getSelectedText() {
+  try {
+    var a = document.activeElement;
+    if (a && typeof a.selectionStart === 'number' && a.selectionEnd > a.selectionStart &&
+        typeof a.value === 'string') {
+      return a.value.substring(a.selectionStart, a.selectionEnd);
+    }
+    if (window.getSelection) {
+      var sel = window.getSelection();
+      if (sel) { return String(sel); }
+    }
+    if (document.selection && document.selection.createRange) {
+      return document.selection.createRange().text || '';
+    }
+  } catch (e) {}
+  return '';
+}
+
+// O campo editavel com foco agora, ou null. Base das quatro funcoes abaixo,
+// que o Pascal chama quando intercepta Ctrl+C/V/X/A (ver
+// TGitStatusView.HandleAppMessage: a IDE captura esses atalhos antes de a
+// mensagem chegar a janela dockada, entao quem dispara a acao e o Pascal).
+function focusedField() {
+  var a = document.activeElement;
+  if (a && typeof a.value === 'string' && typeof a.selectionStart === 'number') {
+    return a;
+  }
+  return null;
+}
+
+function gitCopySelection() {
+  var text = getSelectedText();
+  if (!text) { return; }
+  el('copyBuffer').value = text;
+  send({ type: 'clipboard.copy' });
+}
+
+function gitCutSelection() {
+  var f = focusedField();
+  if (!f || f.selectionEnd <= f.selectionStart) { return; }
+  var start = f.selectionStart;
+  el('copyBuffer').value = f.value.substring(start, f.selectionEnd);
+  f.value = f.value.substring(0, start) + f.value.substring(f.selectionEnd);
+  f.selectionStart = start;
+  f.selectionEnd = start;
+  send({ type: 'clipboard.copy' });
+}
+
+function gitInsertText(json) {
+  try {
+    var text = JSON.parse(json).text || '';
+    var f = focusedField();
+    if (!f || !text) { return; }
+    var start = f.selectionStart;
+    f.value = f.value.substring(0, start) + text + f.value.substring(f.selectionEnd);
+    f.selectionStart = start + text.length;
+    f.selectionEnd = f.selectionStart;
+  } catch (e) {}
+}
+
+function gitSelectAllInField() {
+  var f = focusedField();
+  if (f && f.select) { f.select(); }
+}
+
+function onKeyDown(e) {
+  var ev = e || window.event;
+  var key = ev.keyCode || ev.which;
+
+  // Ctrl+Enter comita de qualquer lugar do painel.
+  if (key === 13 && (ev.ctrlKey || ev.metaKey)) {
+    doCommit();
+    if (ev.preventDefault) { ev.preventDefault(); } else { ev.returnValue = false; }
+    return false;
+  }
+
+  // F5 atualiza.
+  if (key === 116) {
+    send({ type: 'refresh' });
+    if (ev.preventDefault) { ev.preventDefault(); } else { ev.returnValue = false; }
+    return false;
+  }
+
+  // Ctrl+C / Ctrl+Insert: copia via Pascal.
+  if ((ev.ctrlKey || ev.metaKey) && (key === 67 || key === 45)) {
+    var text = getSelectedText();
+    if (!text) { return true; }
+    el('copyBuffer').value = text;
+    send({ type: 'clipboard.copy' });
+    if (ev.preventDefault) { ev.preventDefault(); } else { ev.returnValue = false; }
+    return false;
+  }
+
+  return true;
+}
+
+// ------------------------------------------- alca de altura do composer ---
+var resizing = false;
+var startY = 0;
+var startH = 0;
+
+function onResizeStart(e) {
+  var ev = e || window.event;
+  resizing = true;
+  startY = ev.clientY;
+  startH = el('commitMsg').offsetHeight;
+  if (ev.preventDefault) { ev.preventDefault(); } else { ev.returnValue = false; }
+  return false;
+}
+
+function onResizeMove(e) {
+  if (!resizing) { return true; }
+  var ev = e || window.event;
+  var h = startH + (startY - ev.clientY);
+  if (h < 48) { h = 48; }
+  if (h > 320) { h = 320; }
+  el('commitMsg').style.height = h + 'px';
+  return true;
+}
+
+function onResizeEnd() {
+  resizing = false;
+  return true;
+}
+
+// ---------------------------------------------------------------- boot ---
+function bind(target, name, fn) {
+  if (!target) { return; }
+  if (target.addEventListener) {
+    target.addEventListener(name, fn, false);
+  } else if (target.attachEvent) {
+    target.attachEvent('on' + name, fn);
+  }
+}
+
+function onReady() {
+  bind(document, 'keydown', onKeyDown);
+  bind(el('composerResizer'), 'mousedown', onResizeStart);
+  bind(document, 'mousemove', onResizeMove);
+  bind(document, 'mouseup', onResizeEnd);
+  // Avisa o Pascal que o DOM esta montado e o estado pode vir.
+  send({ type: 'ready' });
+}
+
+if (document.addEventListener) {
+  document.addEventListener('DOMContentLoaded', onReady, false);
+} else {
+  window.attachEvent('onload', onReady);
+}
+</script>
+</body>
+</html>
